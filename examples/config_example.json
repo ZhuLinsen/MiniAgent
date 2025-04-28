@@ -1,0 +1,19 @@
+{
+  "llm": {
+    "model": "deepseek-chat",
+    "api_base": "https://api.deepseek.com/v1",
+    "temperature": 0.7,
+    "max_tokens": 1000,
+    "top_p": 1.0,
+    "frequency_penalty": 0.0,
+    "presence_penalty": 0.0,
+    "timeout": 120,
+    "max_retries": 3
+  },
+  "system_prompt": "You are an intelligent assistant that can use various tools to help users complete tasks. You need to understand user requirements and use appropriate tools to meet these needs. When you need to use tools, please use the specified JSON format to call tools. If you don't need to use tools, please respond to the user directly.",
+  "default_tools": ["calculator", "web_search", "get_current_time"],
+  "output_format": "text",
+  "enable_reflection": true,
+  "reflection_max_iterations": 3,
+  "reflection_system_prompt": "You are a reflection system responsible for checking whether the AI assistant's responses and tool calls are correct. Please check tool call format, tool names, parameter completeness and answer quality. If you find problems, please suggest modifications; if everything is normal, please reply 'PASS'."
+} 
