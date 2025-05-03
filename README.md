@@ -1,6 +1,6 @@
 # MiniAgent
 
-- 🚀「5分钟从零实现LLM Agent！」 ⚡️ 5分钟构建你的第一个LLM Agent！| [English Version](README_EN.md)
+- 🚀「5分钟从零实现LLM Agent！」 |⚡️[English Version](README_EN.md)
 
 <div align="center">
   <img src="miniagent.png" alt="MiniAgent" width="600"/>
@@ -8,9 +8,8 @@
 
 ## 为什么选择MiniAgent？
 
-在快速发展的LLM（大语言模型）世界中，我们已经见证了它们惊人的能力。然而，要真正释放它们的潜力，我们需要让它们能够与工具和环境交互 - 这就是AI Agent的用武之地。
 
-对于初学者来说，理解Agent原理并实现一个Agent可能是一项艰巨的任务。复杂的框架、繁琐的配置和陡峭的学习曲线常常让新手望而却步。这就是我们创建**MiniAgent**的原因。
+帮助初学者，快速理解Agent原理并实现一个Agent。无需复杂的框架、繁琐的配置和陡峭的学习曲线。这就是我们创建**MiniAgent**的原因。
 
 如果这个项目对你有帮助，请给我们一个⭐️！你的支持是我们持续改进的动力。
 
@@ -19,20 +18,11 @@
 
 MiniAgent是一个轻量级且易于使用的LLM Agent框架。以下是选择MiniAgent的理由：
 
-- **快速学习**：学习LLM Agent工作原理的完美起点
-- **模型无关**：适用于任何LLM，即使没有函数调用支持
+- **快速学习**：快速学习LLM Agent工作原理
+- **模型无关**：适用于任何LLM，即使没有原生函数调用能力，兼容OpenAI、DeepSeek、Anthropic等LLM
 - **极简设计**：专注于核心功能的清晰、可读代码
 - **轻量级**：无重依赖，易于集成和扩展
-
-主要功能包括：
-
-- **多LLM支持**：兼容OpenAI、DeepSeek、Anthropic等LLM
 - **简单工具集成**：通过自然语言轻松注册和调用工具
-- **无需函数调用**：适用于任何LLM，即使没有原生函数调用能力
-- **响应反思**：可选的机制来提高答案质量和推理能力
-- **基于环境的配置**：通过环境变量或dotfiles简单配置
-- **快速学习曲线**：学习LLM Agent概念和实现的完美选择
-- **LLM验证工具**：内置脚本验证API连接和能力
 
 ## 快速开始
 
@@ -103,7 +93,7 @@ agent = MiniAgent(llm_config={
 })
 
 # 加载工具
-tools = load_tools(["calculator", "web_search", "get_current_time"])
+tools = load_tools(["calculator", "get_current_time"])
 
 # 运行Agent
 response = agent.run(
