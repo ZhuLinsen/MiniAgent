@@ -1,6 +1,12 @@
-# MiniAgent - Build Your First AI Agent in 3 Minutes
+# MiniAgent
 
-[中文版本](README.md)
+- 🚀「Build Your First LLM Agent in 5 Minutes!」 ⚡️ Build an LLM agent from scratch in 5 minutes! | [中文版本](README.md)
+    
+
+<div align="center">
+  <img src="miniagent.png" alt="MiniAgent" width="600"/>
+</div>
+
 
 ## Why Do We Need AI Agents?
 

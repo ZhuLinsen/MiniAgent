@@ -1,8 +1,10 @@
 # MiniAgent
 
-- 🚀「5分钟从零实现LLM Agent！」 ⚡️ 5分钟构建你的第一个LLM Agent！
+- 🚀「5分钟从零实现LLM Agent！」 ⚡️ 5分钟构建你的第一个LLM Agent！| [English Version](README_EN.md)
 
-[English Version](README_EN.md)
+<div align="center">
+  <img src="miniagent.png" alt="MiniAgent" width="600"/>
+</div>
 
 ## 为什么选择MiniAgent？
 
