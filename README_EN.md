@@ -83,12 +83,8 @@ def calculator(expression: str) -> float:
     """Calculate the result of a mathematical expression"""
     return eval(expression)
 
-# Create Agent
-agent = MiniAgent(llm_config={
-    "model": "gpt-3.5-turbo",  # Use any supported model
-    "api_key": "your_api_key",
-    "temperature": 0.7
-})
+# Create Agent, use the config in .env file
+agent = MiniAgent()
 
 # Load tools
 tools = load_tools(["calculator", "get_current_time"])
