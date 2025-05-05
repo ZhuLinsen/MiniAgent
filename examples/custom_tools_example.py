@@ -7,7 +7,6 @@ Example demonstrating custom tool registration and usage
 
 import os
 import sys
-import logging
 from pathlib import Path
 from typing import Dict
 from dotenv import load_dotenv
@@ -16,13 +15,13 @@ from dotenv import load_dotenv
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 # Import required modules
 from miniagent import MiniAgent
 from miniagent.tools import register_tool, get_tool_description
+from miniagent.logger import get_logger
+
+# Configure logging using MiniAgent's logger
+logger = get_logger("custom_tools_example")
 
 # Custom tool functions
 @register_tool

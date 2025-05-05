@@ -3,8 +3,7 @@ Implementation of Reflector for agent response reflection and improvement
 """
 
 import logging
-import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -14,7 +13,7 @@ class Reflector:
     Reflector class for enhancing agent responses through self-reflection and criticism
     """
     
-    def __init__(self, client, model: str, config: Dict[str, Any] = None):
+    def __init__(self, client=None, model: str = None, config: Dict[str, Any] = None):
         """
         Initialize Reflector
         
@@ -34,6 +33,53 @@ class Reflector:
         
         logger.debug(f"Reflector initialized, model: {model}, disabled: {self.disabled}")
     
+    def apply_reflection(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """
+        Apply reflection to a conversation
+        
+        This method examines the conversation history and adds reflection
+        to improve the agent's reasoning process.
+        
+        Args:
+            messages: Conversation messages
+            
+        Returns:
+            Potentially modified messages
+        """
+        if self.disabled or not self.client or not self.model:
+            return messages
+            
+        # Simple implementation - get the last user query and assistant response
+        if len(messages) < 2:
+            return messages
+            
+        # Extract the last user query
+        last_user_msg = None
+        last_assistant_msg = None
+        
+        # Find the most recent user-assistant exchange
+        for i in range(len(messages)-1, 0, -1):
+            if messages[i]["role"] == "assistant" and last_assistant_msg is None:
+                last_assistant_msg = messages[i]["content"]
+            elif messages[i]["role"] == "user" and last_assistant_msg is not None and last_user_msg is None:
+                last_user_msg = messages[i]["content"]
+                break
+                
+        if not last_user_msg or not last_assistant_msg:
+            return messages
+            
+        # Reflect on the response
+        improved_response = self.reflect(last_user_msg, last_assistant_msg)
+        
+        # If reflection improved the response, update the last assistant message
+        if improved_response and improved_response != last_assistant_msg:
+            for i in range(len(messages)-1, 0, -1):
+                if messages[i]["role"] == "assistant":
+                    messages[i]["content"] = improved_response
+                    break
+                    
+        return messages
+    
     def reflect(self, query: str, current_response: str) -> str:
         """
         Reflect on and improve the current response
@@ -45,8 +91,8 @@ class Reflector:
         Returns:
             Improved response or original response (if no improvement)
         """
-        if self.disabled:
-            logger.debug("Reflector is disabled, skipping reflection process")
+        if self.disabled or not self.client or not self.model:
+            logger.debug("Reflector is disabled or not fully configured, skipping reflection process")
             return current_response
             
         if not current_response.strip():

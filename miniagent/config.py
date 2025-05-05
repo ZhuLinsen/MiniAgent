@@ -16,9 +16,9 @@ try:
 except ImportError:
     pass  # Ignore if dotenv is not installed
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# Configure logging - use existing logger instead of initializing again
+from .logger import get_logger
+logger = get_logger(__name__)
 
 @dataclass
 class LLMConfig:

@@ -16,15 +16,13 @@ import traceback
 # Add project root directory to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Configure logging
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
 # Import MiniAgent main class and configuration
 from miniagent.agent import MiniAgent
 from miniagent.tools import register_tool, get_tool
 from miniagent.logger import get_logger
+
+# Configure logging using MiniAgent's logger
+logger = get_logger("example_script")
 
 def main():
     """
@@ -54,8 +52,8 @@ def main():
             api_key=api_key,
             base_url=os.environ.get("LLM_API_BASE", "https://api.deepseek.com/v1"),
             temperature=float(os.environ.get("LLM_TEMPERATURE", "0.7")),
-            use_reflector=os.environ.get("ENABLE_REFLECTION", "false").lower() == "true",
-            system_prompt="You are a helpful assistant that can use tools to answer questions. When you need information, use the appropriate tools. available_tools contains the list of tools you can use."
+            system_prompt="You are a helpful assistant that can use tools to answer questions. When you need information, use the appropriate tools.",
+            use_reflector=True
         )
         
         # Load tools
@@ -63,7 +61,6 @@ def main():
         # Explicitly load each required tool
         agent.tools = []  # Clear existing tools
         agent.load_builtin_tool("calculator")
-        agent.load_builtin_tool("web_search")
         agent.load_builtin_tool("get_current_time")
         agent.load_builtin_tool("system_info")
         
@@ -74,17 +71,22 @@ def main():
         user_query = "What is the current time? Please provide a system information overview."
         logger.info(f"User query: {user_query}")
         
-        # Execute query and handle response
+        # Execute query using the run method
+        print("\n" + "-"*50)
+        print("MiniAgent Example - Using Tools")
+        print("-"*50)
+        print("User query:", user_query)
+        print("-"*50)
+        
+        # Use run method for tool execution with formatted text approach
         response = agent.run(user_query)
         
         # Log response
         logger.info(f"Agent response: {response}")
         
         # Print response results
-        print("\n" + "-"*50)
-        print("User query:", user_query)
-        print("-"*50)
-        print("Agent response:", response)
+        print("Agent response:")
+        print(response)
         print("-"*50)
         
     except Exception as e:

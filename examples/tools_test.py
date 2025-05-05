@@ -2,94 +2,93 @@
 # -*- coding: utf-8 -*-
 
 """
-测试所有可用工具的示例脚本
+Example script to test all available tools
 """
 
 import os
 import sys
-import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 添加项目根目录到路径
+# Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# 导入所需模块
+# Import required modules
 from miniagent.tools import load_tools
+from miniagent.logger import get_logger
+
+# Configure logging using MiniAgent's logger
+logger = get_logger("tools_test")
 
 def test_basic_tools():
-    """测试基础工具"""
-    print("\n=== 测试基础工具 ===")
+    """Test basic tools"""
+    print("\n=== Testing Basic Tools ===")
     
-    # 测试计算器
+    # Test calculator
     from miniagent.tools.basic_tools import calculator
     result = calculator("123 * 456 + 789")
-    print(f"计算器测试: 123 * 456 + 789 = {result}")
+    print(f"Calculator test: 123 * 456 + 789 = {result}")
     
-    # 测试获取当前时间
+    # Test get current time
     from miniagent.tools.basic_tools import get_current_time
     time_info = get_current_time()
-    print(f"当前时间: {time_info['formatted']}")
+    print(f"Current time: {time_info['formatted']}")
     
-    # 测试系统信息
+    # Test system info
     from miniagent.tools.basic_tools import system_info
     sys_info = system_info()
-    print(f"系统信息: {sys_info['platform']} {sys_info['platform_release']}")
+    print(f"System info: {sys_info['platform']} {sys_info['platform_release']}")
     
-    # 测试文件统计
+    # Test file stats
     from miniagent.tools.basic_tools import file_stats
     stats = file_stats(".", "*.py")
-    print(f"Python文件统计: {stats['file_count']}个文件")
+    print(f"Python file stats: {stats['file_count']} files")
 
 def test_network_tools():
-    """测试网络工具"""
-    print("\n=== 测试网络工具 ===")
+    """Test network tools"""
+    print("\n=== Testing Network Tools ===")
     
-    # 测试HTTP请求
+    # Test HTTP request
     from miniagent.tools.basic_tools import http_request
     response = http_request("https://api.github.com/zen")
-    print(f"GitHub API响应: {response['data']}")
+    print(f"GitHub API response: {response['data']}")
     
-    # 测试网页搜索（需要SERPAPI_KEY）
+    # Test web search (requires SERPAPI_KEY)
     from miniagent.tools.basic_tools import web_search
     try:
-        results = web_search("Python 编程", num_results=3)
-        print(f"搜索结果: {len(results)}条")
+        results = web_search("Python programming", num_results=3)
+        print(f"Search results: {len(results)} items")
     except Exception as e:
-        print(f"搜索测试失败: {str(e)}")
+        print(f"Search test failed: {str(e)}")
 
 def test_system_tools():
-    """测试系统工具"""
-    print("\n=== 测试系统工具 ===")
+    """Test system tools"""
+    print("\n=== Testing System Tools ===")
     
-    # 测试磁盘使用情况
+    # Test disk usage
     from miniagent.tools.basic_tools import disk_usage
     usage = disk_usage("/")
-    print(f"磁盘使用情况: {usage['percent_used']}%")
+    print(f"Disk usage: {usage['percent_used']}%")
     
-    # 测试进程列表
+    # Test process list
     from miniagent.tools.basic_tools import process_list
     processes = process_list(limit=5)
-    print("CPU占用最高的5个进程:")
+    print("Top 5 processes by CPU usage:")
     for proc in processes:
         print(f"- {proc['name']}: {proc['cpu_percent']}%")
     
-    # 测试系统负载
+    # Test system load
     from miniagent.tools.basic_tools import system_load
     load = system_load()
-    print(f"系统负载: CPU {load['cpu']['percent']}%, 内存 {load['memory']['percent']}%")
+    print(f"System load: CPU {load['cpu']['percent']}%, Memory {load['memory']['percent']}%")
 
 def main():
-    """主函数"""
-    # 加载环境变量
+    """Main function"""
+    # Load environment variables
     load_dotenv()
     
-    # 测试所有工具
+    # Test all tools
     test_basic_tools()
     test_network_tools()
     test_system_tools()

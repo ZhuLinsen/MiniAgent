@@ -8,7 +8,7 @@
 
 ## Why Choose MiniAgent?
 
-Help beginners quickly understand Agent principles and implement an Agent. No complex frameworks, tedious configurations, or steep learning curves. This is why we created **MiniAgent**.
+Help beginners quickly understand Agent principles and implement an Agent. Gain intuitive insights into the details of LLM interaction with tools without complex frameworks, tedious configurations, or steep learning curves.
 
 If you find this project helpful, please give us a ⭐️! Your support drives us to keep improving.
 
@@ -16,7 +16,7 @@ If you find this project helpful, please give us a ⭐️! Your support drives u
 
 MiniAgent is a lightweight and easy-to-use LLM Agent framework. Here's why you should choose MiniAgent:
 
-- **Rapid Learning**: Quickly learn how LLM agents work
+- **Rapid Learning**: Quickly learn how LLM agents work and understand the details of LLM interaction with tools
 - **Model Agnostic**: Works with any LLM, even without native function calling capability, compatible with OpenAI, DeepSeek, Anthropic, and other LLMs
 - **Minimalist Design**: Clean, readable code focused on core functionality
 - **Lightweight**: No heavy dependencies, easy to integrate and extend
