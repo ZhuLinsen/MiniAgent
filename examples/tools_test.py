@@ -83,6 +83,26 @@ def test_system_tools():
     load = system_load()
     print(f"System load: CPU {load['cpu']['percent']}%, Memory {load['memory']['percent']}%")
 
+
+def test_code_tools():
+    """Test code editing tools"""
+    print("\n=== Testing Code Tools ===")
+
+    import tempfile
+    from pathlib import Path
+
+    from miniagent.tools.code_tools import read, write, edit, glob, grep, bash
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        f = root / "t.txt"
+        print(write(str(f), "one\ntwo\nthree\n"))
+        print(read(str(f), offset=1, limit=10))
+        print(edit(str(f), "two", "TWO", all=False))
+        print(grep("TWO", path=str(root)))
+        print(glob("**/*.txt", path=str(root)))
+        print(bash("echo ok"))
+
 def main():
     """Main function"""
     # Load environment variables
@@ -92,6 +112,7 @@ def main():
     test_basic_tools()
     test_network_tools()
     test_system_tools()
+    test_code_tools()
 
 if __name__ == "__main__":
     main() 

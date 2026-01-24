@@ -249,3 +249,5 @@ cython_debug/
 .idea/
 .vscode/
 *.swp
+
+miniagent/docs/

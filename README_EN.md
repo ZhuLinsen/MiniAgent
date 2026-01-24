@@ -33,12 +33,24 @@ MiniAgent is a lightweight and easy-to-use LLM Agent framework. Here's why you s
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/MiniAgent.git
+git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
 
 # Install dependencies
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+
+# (Recommended) install CLI entry points
+python -m pip install -e .
 ```
+
+If you prefer not to install commands, you can run via modules:
+
+```bash
+python -m miniagent
+python -m miniagent.gui
+```
+
+Note: `miniagent` / `miniagent-gui` are installed into the *current Python environment* scripts directory. If you're using conda/venv, activate that environment before running the commands.
 
 ### Configuration
 
@@ -71,31 +83,56 @@ Run a simple example:
 python examples/simple_example.py
 ```
 
+## CLI Mode (New)
+
+After installation, start the interactive CLI:
+
+```bash
+miniagent
+```
+
+If you see `miniagent: command not found`, you likely didn't run `python -m pip install -e .` (or your PATH doesn't include the scripts directory). You can also run:
+
+```bash
+python -m miniagent
+```
+
+Built-in commands: `/help`, `/c`, `/q`.
+
+## Desktop GUI (New)
+
+Tkinter-based (zero extra dependencies):
+
+```bash
+miniagent-gui
+```
+
+## Code Tools (New)
+
+Added 6 code tools: `read`/`write`/`edit`/`glob`/`grep`/`bash` (see `miniagent/tools/code_tools.py`).
+
 ## Creating Your Own Agent
 
 ```python
 from miniagent import MiniAgent
-from miniagent.tools import load_tools, register_tool
+from miniagent.config import load_config
 
-# Define custom tool (optional)
-@register_tool
-def calculator(expression: str) -> float:
-    """Calculate the result of a mathematical expression"""
-    return eval(expression)
+cfg = load_config()
 
-# Create Agent, use the config in .env file
-agent = MiniAgent()
-
-# Load tools
-tools = load_tools(["calculator", "get_current_time"])
-
-# Run Agent
-response = agent.run(
-    query="What's the current time? Also calculate 123 × 456.",
-    tools=tools
+agent = MiniAgent(
+  model=cfg.llm.model,
+  api_key=cfg.llm.api_key,
+  base_url=cfg.llm.api_base,
+  temperature=cfg.llm.temperature,
+  system_prompt=cfg.system_prompt,
+  use_reflector=cfg.enable_reflection,
 )
 
-print(response)
+agent.tools = []
+for name in ["calculator", "get_current_time", "read", "write", "grep"]:
+  agent.load_builtin_tool(name)
+
+print(agent.run("What's the current time? Also calculate 123 * 456."))
 ```
 
 ## Examples

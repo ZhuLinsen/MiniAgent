@@ -35,12 +35,24 @@ MiniAgent是一个轻量级且易于使用的LLM Agent框架。以下是选择Mi
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/MiniAgent.git
+git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
 
 # 安装依赖
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+
+# （推荐）把 miniagent/miniagent-gui 安装为命令
+python -m pip install -e .
 ```
+
+如果你不想安装命令，也可以直接用模块方式运行：
+
+```bash
+python -m miniagent
+python -m miniagent.gui
+```
+
+注意：`miniagent` / `miniagent-gui` 会安装到“当前 Python 环境”的脚本目录里；如果你在用 conda/venv，请先激活对应环境后再运行命令。
 
 ### 配置
 
@@ -73,31 +85,60 @@ python validate_llm.py
 python examples/simple_example.py
 ```
 
+## CLI 模式（新增）
+
+安装后可直接运行交互式 CLI：
+
+```bash
+miniagent
+```
+
+如果提示 `miniagent: command not found`，说明还没执行 `python -m pip install -e .`（或当前环境的 PATH 未包含脚本目录）；你也可以用：
+
+```bash
+python -m miniagent
+```
+
+内置命令：`/help`、`/c`、`/q`。
+
+## Desktop GUI（新增）
+
+使用 Tkinter（零额外依赖）：
+
+```bash
+miniagent-gui
+```
+
+## 代码工具（新增）
+
+新增 6 个 code tools：`read`/`write`/`edit`/`glob`/`grep`/`bash`（见 `miniagent/tools/code_tools.py`）。
+
 ## 创建你自己的Agent
 
 ```python
+import os
+
 from miniagent import MiniAgent
-from miniagent.tools import load_tools, register_tool
+from miniagent.config import load_config
 
-# 定义自定义工具（可选）
-@register_tool
-def calculator(expression: str) -> float:
-    """计算数学表达式的结果"""
-    return eval(expression)
+# 读取环境变量 / 配置文件（默认会从环境变量读取）
+cfg = load_config()
 
-# 创建Agent, 使用.env中的配置
-agent = MiniAgent()
-
-# 加载工具
-tools = load_tools(["calculator", "get_current_time"])
-
-# 运行Agent
-response = agent.run(
-    query="现在几点了？同时计算123 × 456。",
-    tools=tools
+agent = MiniAgent(
+  model=cfg.llm.model,
+  api_key=cfg.llm.api_key,
+  base_url=cfg.llm.api_base,
+  temperature=cfg.llm.temperature,
+  system_prompt=cfg.system_prompt,
+  use_reflector=cfg.enable_reflection,
 )
 
-print(response)
+# 加载内置工具（按需）
+agent.tools = []
+for name in ["calculator", "get_current_time", "read", "write", "grep"]:
+  agent.load_builtin_tool(name)
+
+print(agent.run("现在几点了？同时计算 123 * 456。"))
 ```
 
 ## 示例

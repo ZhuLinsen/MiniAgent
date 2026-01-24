@@ -241,9 +241,16 @@ try:
         calculator, get_current_time, system_info, file_stats,
         disk_usage, process_list, system_load, web_search, http_request
     )
-    logger.info("Imported all tools from basic_tools")
+    logger.debug("Imported all tools from basic_tools")
 except ImportError as e:
     logger.warning(f"Failed to import some tools: {e}")
+
+# Code tools (optional import so the package remains robust)
+try:
+    from .code_tools import read, write, edit, glob, grep, bash
+    logger.debug("Imported all tools from code_tools")
+except ImportError as e:
+    logger.warning(f"Failed to import code tools: {e}")
 
 def load_tools(tools: Union[List[str], str, None] = None) -> List[str]:
     """
@@ -260,6 +267,7 @@ def load_tools(tools: Union[List[str], str, None] = None) -> List[str]:
         tools = [
             "calculator", "get_current_time", "system_info", "file_stats",
             "disk_usage", "process_list", "system_load", "web_search", "http_request"
+            , "read", "write", "edit", "glob", "grep", "bash"
         ]
     
     if isinstance(tools, str):

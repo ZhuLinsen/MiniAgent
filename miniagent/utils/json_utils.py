@@ -68,25 +68,46 @@ def parse_json(json_str: str) -> Dict:
         Parsed dictionary
     """
     if not json_str:
-        logger.warning("Received empty JSON string")
+        logger.debug("Received empty JSON string")
         return {}
     
     try:
         # First try direct parsing
         return json.loads(json_str)
     except json.JSONDecodeError:
-        logger.warning(f"JSON parsing failed, attempting to fix: {truncate_message_content(json_str)}")
+        logger.debug(f"JSON parsing failed, attempting to fix: {truncate_message_content(json_str)}")
         
+        # Try with strict=False to allow control characters (newlines in strings)
+        try:
+            return json.loads(json_str, strict=False)
+        except json.JSONDecodeError:
+            pass
+        
+        # Try to fix unescaped newlines in string values
+        # This is common when LLM generates multi-line code
+        try:
+            # Replace actual newlines within string values with \\n
+            fixed_json = _fix_unescaped_newlines(json_str)
+            return json.loads(fixed_json)
+        except (json.JSONDecodeError, Exception):
+            pass
+
         # Try to fix common issues and parse again
         # 1. Try to extract JSON from text
-        json_match = re.search(r'```json\s*([\s\S]*?)\s*```|```([\s\S]*?)```|{[\s\S]*}', json_str)
+        json_match = re.search(r'```json\s*([\s\S]*?)\s*```|```([\s\S]*?)```|(\{[\s\S]*\})', json_str)
         if json_match:
-            extracted_json = json_match.group(1) or json_match.group(2) or json_match.group(0)
+            extracted_json = json_match.group(1) or json_match.group(2) or json_match.group(3)
             try:
                 return json.loads(extracted_json)
             except json.JSONDecodeError:
-                logger.warning(f"Extracted JSON still cannot be parsed: {truncate_message_content(extracted_json)}")
-                pass
+                try:
+                    return json.loads(extracted_json, strict=False)
+                except json.JSONDecodeError:
+                    try:
+                        fixed = _fix_unescaped_newlines(extracted_json)
+                        return json.loads(fixed)
+                    except:
+                        pass
         
         # 2. Try to fix quote issues
         fixed_json = json_str.replace("'", '"')
@@ -101,8 +122,50 @@ def parse_json(json_str: str) -> Dict:
         try:
             return json.loads(fixed_json)
         except json.JSONDecodeError:
-            logger.error(f"Unable to parse JSON: {truncate_message_content(json_str)}")
+            logger.debug(f"Unable to parse JSON: {truncate_message_content(json_str)}")
             return {}
+
+
+def _fix_unescaped_newlines(json_str: str) -> str:
+    """
+    Fix unescaped newlines inside JSON string values.
+    This handles the common case where LLM generates multi-line code
+    without properly escaping newlines.
+    """
+    result = []
+    in_string = False
+    escape_next = False
+    
+    for char in json_str:
+        if escape_next:
+            result.append(char)
+            escape_next = False
+            continue
+            
+        if char == '\\':
+            result.append(char)
+            escape_next = True
+            continue
+            
+        if char == '"':
+            in_string = not in_string
+            result.append(char)
+            continue
+            
+        if in_string and char == '\n':
+            result.append('\\n')
+            continue
+            
+        if in_string and char == '\r':
+            continue  # Skip carriage returns
+            
+        if in_string and char == '\t':
+            result.append('\\t')
+            continue
+            
+        result.append(char)
+    
+    return ''.join(result)
 
 def truncate_message_content(content: str, max_length: int = 100) -> str:
     """
@@ -239,4 +302,4 @@ def format_tool_response(tool_call: Dict, response: Any) -> Dict:
     return {
         "name": tool_name,
         "content": content
-    } 
+    }

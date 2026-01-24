@@ -5,12 +5,16 @@ Logging module providing consistent logging across the entire application.
 import logging
 import os
 from typing import Dict, Optional, List
+from rich.logging import RichHandler
 
 # Global logger dictionary to keep track of created loggers
 _LOGGERS: Dict[str, logging.Logger] = {}
 
 # Flag to track if root logger has been configured
 _ROOT_LOGGER_CONFIGURED = False
+
+# Flag to indicate CLI mode (suppress verbose logging)
+_CLI_MODE = False
 
 # List of loggers to fix duplicate handlers for third-party libraries
 _THIRD_PARTY_LOGGERS = ["httpx", "httpcore", "urllib3"]
@@ -102,8 +106,13 @@ def _configure_root_logger(level: Optional[int] = None, format_str: Optional[str
             root_logger.removeHandler(handler)
     
     # Set log level from environment variable or default to INFO
+    # In CLI mode, default to WARNING to keep output clean
     if level is None:
-        env_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+        if _CLI_MODE:
+            default_level = "WARNING"
+        else:
+            default_level = "INFO"
+        env_level = os.environ.get("LOG_LEVEL", default_level).upper()
         level_map = {
             "DEBUG": logging.DEBUG,
             "INFO": logging.INFO,
@@ -117,12 +126,12 @@ def _configure_root_logger(level: Optional[int] = None, format_str: Optional[str
     
     # Set default format if not provided
     if format_str is None:
-        format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format_str = "%(message)s"
         
     formatter = logging.Formatter(format_str)
     
     # Add console handler
-    console_handler = logging.StreamHandler()
+    console_handler = RichHandler(rich_tracebacks=True, markup=True)
     console_handler.setFormatter(formatter)
     console_handler.setLevel(level)
     root_logger.addHandler(console_handler)
@@ -190,4 +199,23 @@ def setup_root_logger(level: Optional[int] = None, format_str: Optional[str] = N
         file_handler = logging.FileHandler(log_file)
         file_handler.setFormatter(formatter)
         file_handler.setLevel(level or logging.INFO)
-        root_logger.addHandler(file_handler) 
+        root_logger.addHandler(file_handler)
+
+
+def set_cli_mode(enabled: bool = True) -> None:
+    """
+    Enable or disable CLI mode.
+    In CLI mode, log level defaults to WARNING to keep terminal output clean.
+    
+    Args:
+        enabled: Whether to enable CLI mode
+    """
+    global _CLI_MODE, _ROOT_LOGGER_CONFIGURED
+    _CLI_MODE = enabled
+    
+    # Reconfigure root logger if already configured
+    if _ROOT_LOGGER_CONFIGURED:
+        _ROOT_LOGGER_CONFIGURED = False
+        _configure_root_logger()
+        _fix_third_party_loggers()
+        _ROOT_LOGGER_CONFIGURED = True

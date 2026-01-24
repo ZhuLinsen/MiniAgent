@@ -1,8 +1,21 @@
-"""MiniAgent - A lightweight Agent framework
+"""MiniAgent - A lightweight Agent framework.
 
-Build an LLM agent from scratch in 5 minutes! ⚡️
+This package keeps imports lightweight: importing `miniagent` should not
+automatically import LLM clients unless you actually use `MiniAgent`.
 """
 
-from .agent import MiniAgent
+from __future__ import annotations
 
-__version__ = "0.1.0" 
+from typing import Any
+
+__version__ = "0.1.0"
+
+__all__ = ["MiniAgent", "__version__"]
+
+
+def __getattr__(name: str) -> Any:
+	if name == "MiniAgent":
+		from .agent import MiniAgent  # local import (lazy)
+
+		return MiniAgent
+	raise AttributeError(name)

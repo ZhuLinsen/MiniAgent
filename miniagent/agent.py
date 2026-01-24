@@ -5,15 +5,12 @@ import json
 import re
 import time
 import logging
-from typing import Dict, List, Any, Optional, Union
-import openai
-from openai import OpenAI
+from typing import Any, Callable, Dict, List, Optional, Union
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
-from .config import AgentConfig, load_config
-from .tools import get_registered_tools, get_tool, execute_tool, get_tool_description
 from .logger import get_logger
-from .utils.reflector import Reflector
+from .utils.json_utils import parse_json
+from .tools import get_registered_tools, get_tool, get_tool_description
 
 logger = get_logger(__name__)
 
@@ -78,9 +75,9 @@ class MiniAgent:
     def _init_openai_client(self):
         """Initialize OpenAI client"""
         try:
-            import openai
-            
-            self.client = openai.OpenAI(
+            import openai as _openai
+
+            self.client = _openai.OpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url
             )
@@ -95,9 +92,9 @@ class MiniAgent:
     def _init_deepseek_client(self):
         """Initialize DeepSeek client"""
         try:
-            import openai
-            
-            self.client = openai.OpenAI(
+            import openai as _openai
+
+            self.client = _openai.OpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url or "https://api.deepseek.com/v1"
             )
@@ -198,32 +195,52 @@ class MiniAgent:
             Tool call information or None
         """
         # Look for tool call patterns with multiple formats
+        # Use greedy matching for JSON to capture multi-line content
         tool_patterns = [
-            r"TOOL:\s*(\w+)\s*ARGS:\s*({.*?})",  # Standard format
-            r"TOL:\s*(\w+)\s*ARGS:\s*({.*?})",   # Typo format (TOL)
-            r"使用工具:\s*(\w+)\s*参数:\s*({.*?})",  # Chinese format
-            r"USE TOOL:\s*(\w+)\s*WITH ARGS:\s*({.*?})",  # Alternative English format
-            r"T\s*O\s*O\s*L\s*:\s*(\w+)\s*A\s*R\s*G\s*S\s*:\s*({.*?})",  # Format with spaces
-            r"工具名称:\s*(\w+)\s*工具参数:\s*({.*?})",  # Alternative Chinese format
-            r"Tool:\s*(\w+)\s*Args:\s*({.*?})",  # Capitalized format
-            r"Tool:\s*(\w+)\s*Arguments:\s*({.*?})"  # Full Arguments format
+            r"TOOL:\s*(\w+)\s*ARGS:\s*(\{[\s\S]*?\})\s*(?=TOOL:|$|[^\{])",  # Standard format with greedy JSON
+            r"TOOL:\s*(\w+)\s*ARGS:\s*(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})",  # Nested braces support
+            r"TOOL:\s*(\w+)\s*ARGS:\s*(\{.*?\})",  # Simple format (fallback)
+            r"TOL:\s*(\w+)\s*ARGS:\s*(\{.*?\})",   # Typo format (TOL)
+            r"使用工具:\s*(\w+)\s*参数:\s*(\{.*?\})",  # Chinese format
+            r"USE TOOL:\s*(\w+)\s*WITH ARGS:\s*(\{.*?\})",  # Alternative English format
+            r"工具名称:\s*(\w+)\s*工具参数:\s*(\{.*?\})",  # Alternative Chinese format
+            r"Tool:\s*(\w+)\s*Args:\s*(\{.*?\})",  # Capitalized format
+            r"Tool:\s*(\w+)\s*Arguments:\s*(\{.*?\})"  # Full Arguments format
         ]
         
         for pattern in tool_patterns:
             match = re.search(pattern, content, re.DOTALL)
             if match:
+                name = match.group(1)
+                args_str = match.group(2)
+                
+                # First try strict parsing
                 try:
                     return {
-                        "name": match.group(1),
-                        "arguments": json.loads(match.group(2))
+                        "name": name,
+                        "arguments": json.loads(args_str)
                     }
                 except json.JSONDecodeError:
-                    logger.error(f"Failed to parse tool arguments: {match.group(2)}")
-                    continue  # Try next pattern
+                    pass
+                
+                # Then try loose parsing via json_utils
+                args = parse_json(args_str)
+                if args:
+                    return {
+                        "name": name,
+                        "arguments": args
+                    }
+                
+                logger.debug(f"Failed to parse tool arguments for {name}")
+                continue
         
         return None
     
-    def _execute_tool(self, tool_call: Dict) -> Any:
+    def _execute_tool(
+        self,
+        tool_call: Dict,
+        tool_callback: Optional[Callable[[str, str, Dict[str, Any]], None]] = None,
+    ) -> Any:
         """
         Execute a tool call
         
@@ -237,12 +254,16 @@ class MiniAgent:
         if not tool:
             return f"Error: Tool {tool_call['name']} not found"
         try:
+            if tool_callback:
+                tool_callback("start", tool_call["name"], {"arguments": tool_call.get("arguments", {})})
             result = tool["executor"](**tool_call["arguments"])
-            # Log tool execution
-            print(f"[Tool Execution] {tool_call['name']} with args: {tool_call['arguments']}")
+            if tool_callback:
+                tool_callback("end", tool_call["name"], {"result": result})
             return result
         except Exception as e:
             logger.error(f"Error executing tool {tool_call['name']}: {e}")
+            if tool_callback:
+                tool_callback("end", tool_call["name"], {"error": str(e)})
             return f"Error executing tool: {str(e)}"
     
     @retry(stop=stop_after_attempt(3), wait=wait_random_exponential(min=1, max=60))
@@ -275,17 +296,29 @@ class MiniAgent:
                 temperature=self.temperature
             )
             return response.choices[0].message.content
-        except openai.APIConnectionError as e:
-            logger.error(f"Connection error: {str(e)}")
-            raise
-        except openai.APIError as e:
-            logger.error(f"OpenAI API error: {str(e)}")
-            raise
         except Exception as e:
+            # Classify OpenAI exceptions if the package is available.
+            if openai is not None:
+                try:
+                    if isinstance(e, openai.APIConnectionError):
+                        logger.error(f"Connection error: {str(e)}")
+                        raise
+                    if isinstance(e, openai.APIError):
+                        logger.error(f"OpenAI API error: {str(e)}")
+                        raise
+                except Exception:
+                    # If OpenAI exception classes changed, fall back to generic handling.
+                    pass
+
             logger.error(f"Error calling LLM: {str(e)}")
             raise
     
-    def run_with_tools(self, query: str, max_iterations: int = 10) -> str:
+    def run_with_tools(
+        self,
+        query: str,
+        max_iterations: int = 10,
+        tool_callback: Optional[Callable[[str, str, Dict[str, Any]], None]] = None,
+    ) -> str:
         """
         Implement tool calling with formatted text
         
@@ -320,11 +353,17 @@ class MiniAgent:
         TOOL: calculator
         ARGS: {{"expression": "2 + 2"}}
         
+        For example, when the user asks "Create a file hello.py", you should respond:
+        TOOL: write
+        ARGS: {{"path": "hello.py", "content": "print('Hello World')"}}
+        
         Note:
         1. You must use strict JSON format
         2. You must use double quotes for strings in JSON
         3. If the parameter value is a number, quotes are not needed
         4. After getting the tool execution result, explain the result in a concise and clear way
+        5. When creating files, ALWAYS use the 'write' tool with 'path' and 'content' parameters
+        6. For multi-line content, use \\n for newlines in JSON strings
         
         If you don't need to use tools, you can directly answer the user's question. If the question is outside the scope of the available tools, use your knowledge to answer directly.
         """
@@ -350,7 +389,7 @@ class MiniAgent:
             
             # Execute tool
             logger.info(f"Executing tool: {tool_call['name']} with args: {tool_call['arguments']}")
-            result = self._execute_tool(tool_call)
+            result = self._execute_tool(tool_call, tool_callback=tool_callback)
             
             # Add tool result to messages
             messages.append({
@@ -377,4 +416,4 @@ class MiniAgent:
         Returns:
             Agent response text
         """
-        return self.run_with_tools(query, max_iterations) 
+        return self.run_with_tools(query, max_iterations)

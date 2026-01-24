@@ -36,4 +36,4 @@ print(response)
 [MiniAgent](https://github.com/ZhuLinsen/MiniAgent)让AI Agent开发不再是遥不可及的复杂技术。三分钟，从零到一，打造属于你的AI助手！家人们，赶紧试试吧！如果觉得不错，请给个star支持一下！
 
 
-*标签*：#AI #Agent #LLM #开源 #Python #人工智能 #开发工具 #新手友好
+*标签*：#AI #Agent #LLM #开源 #MCP #ReAct #Tool Calling #MiniAgent #Python #人工智能 #开发工具 #新手友好
