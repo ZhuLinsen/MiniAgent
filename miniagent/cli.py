@@ -263,7 +263,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         history.append({"role": "assistant", "content": response})
         memory.push("assistant", response)
 
-        console.print(Panel(Markdown(response), title="assistant", style="green", border_style="green"))
+        # Truncate overly long responses for display (keep full in history)
+        display_response = response
+        if len(response) > 2000:
+            # Count lines and truncate if too long
+            lines = response.split('\n')
+            if len(lines) > 50:
+                display_response = '\n'.join(lines[:20]) + f'\n\n... ({len(lines) - 40} lines omitted) ...\n\n' + '\n'.join(lines[-20:])
+            else:
+                display_response = response[:1000] + f'\n\n... ({len(response) - 2000} chars omitted) ...\n\n' + response[-1000:]
+        
+        console.print(Panel(Markdown(display_response), title="assistant", style="green", border_style="green"))
 
     return 0
 

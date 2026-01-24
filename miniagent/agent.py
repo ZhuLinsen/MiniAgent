@@ -187,53 +187,202 @@ class MiniAgent:
     def _parse_tool_call(self, content: str) -> Optional[Dict]:
         """
         Parse tool call from LLM response
-        
+
         Args:
             content: LLM response content
-            
+
         Returns:
             Tool call information or None
         """
-        # Look for tool call patterns with multiple formats
-        # Use greedy matching for JSON to capture multi-line content
-        tool_patterns = [
-            r"TOOL:\s*(\w+)\s*ARGS:\s*(\{[\s\S]*?\})\s*(?=TOOL:|$|[^\{])",  # Standard format with greedy JSON
-            r"TOOL:\s*(\w+)\s*ARGS:\s*(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})",  # Nested braces support
-            r"TOOL:\s*(\w+)\s*ARGS:\s*(\{.*?\})",  # Simple format (fallback)
-            r"TOL:\s*(\w+)\s*ARGS:\s*(\{.*?\})",   # Typo format (TOL)
-            r"使用工具:\s*(\w+)\s*参数:\s*(\{.*?\})",  # Chinese format
-            r"USE TOOL:\s*(\w+)\s*WITH ARGS:\s*(\{.*?\})",  # Alternative English format
-            r"工具名称:\s*(\w+)\s*工具参数:\s*(\{.*?\})",  # Alternative Chinese format
-            r"Tool:\s*(\w+)\s*Args:\s*(\{.*?\})",  # Capitalized format
-            r"Tool:\s*(\w+)\s*Arguments:\s*(\{.*?\})"  # Full Arguments format
+        logger.debug(f"Parsing tool call from content (length={len(content)})")
+
+        # First, try to find TOOL: pattern and extract tool name
+        tool_name_patterns = [
+            r"TOOL:\s*(\w+)\s*ARGS:\s*",
+            r"TOL:\s*(\w+)\s*ARGS:\s*",
+            r"使用工具:\s*(\w+)\s*参数:\s*",
+            r"USE TOOL:\s*(\w+)\s*WITH ARGS:\s*",
+            r"工具名称:\s*(\w+)\s*工具参数:\s*",
+            r"Tool:\s*(\w+)\s*Args:\s*",
+            r"Tool:\s*(\w+)\s*Arguments:\s*"
         ]
-        
-        for pattern in tool_patterns:
+
+        for pattern in tool_name_patterns:
             match = re.search(pattern, content, re.DOTALL)
             if match:
                 name = match.group(1)
-                args_str = match.group(2)
-                
-                # First try strict parsing
-                try:
-                    return {
-                        "name": name,
-                        "arguments": json.loads(args_str)
-                    }
-                except json.JSONDecodeError:
-                    pass
-                
-                # Then try loose parsing via json_utils
-                args = parse_json(args_str)
-                if args:
-                    return {
-                        "name": name,
-                        "arguments": args
-                    }
-                
-                logger.debug(f"Failed to parse tool arguments for {name}")
+                # Find the start of JSON after the pattern
+                json_start = match.end()
+                remaining = content[json_start:]
+
+                # For write tool with content, use special extraction
+                if name == "write":
+                    args = self._extract_write_args(remaining)
+                    if args:
+                        logger.info(f"Parsed write tool call with path: {args.get('path', 'unknown')}")
+                        return {"name": name, "arguments": args}
+
+                # Extract balanced JSON using brace counting
+                args_str = self._extract_balanced_json(remaining)
+
+                if args_str:
+                    logger.debug(f"Matched tool '{name}', args length={len(args_str)}")
+
+                    # First try strict parsing
+                    try:
+                        return {
+                            "name": name,
+                            "arguments": json.loads(args_str)
+                        }
+                    except json.JSONDecodeError as e:
+                        logger.debug(f"Strict JSON parse failed: {e}")
+
+                    # Then try loose parsing via json_utils
+                    args = parse_json(args_str)
+                    if args:
+                        logger.info(f"Parsed tool call: {name} with {len(args)} args")
+                        return {
+                            "name": name,
+                            "arguments": args
+                        }
+
+                    logger.warning(f"Failed to parse tool arguments for {name}: {args_str[:100]}...")
+
+        logger.debug("No tool call pattern matched")
+        return None
+
+    def _extract_write_args(self, text: str) -> Optional[Dict]:
+        """
+        Extract arguments for write tool, handling complex content with unescaped quotes.
+
+        Args:
+            text: Text containing the JSON arguments
+
+        Returns:
+            Dictionary with 'path' and 'content' keys, or None
+        """
+        # Find path field
+        path_match = re.search(r'["\']path["\']\s*:\s*["\']([^"\']+)["\']', text)
+        if not path_match:
+            return None
+
+        path = path_match.group(1)
+
+        # Find content field - look for "content": " or 'content': '
+        content_match = re.search(r'["\']content["\']\s*:\s*["\']', text)
+        if not content_match:
+            return None
+
+        content_start = content_match.end()
+        quote_char = text[content_match.end() - 1]  # The quote character used
+
+        # Find the end of content - look for closing pattern
+        # The content ends with quote + } or quote + , + }
+        # We need to find the LAST occurrence of "} or '}
+        content = self._extract_string_value(text[content_start:], quote_char)
+
+        if content is not None:
+            return {"path": path, "content": content}
+
+        return None
+
+    def _extract_string_value(self, text: str, quote_char: str) -> Optional[str]:
+        """
+        Extract a string value that may contain unescaped quotes.
+        Looks for the closing pattern: quote followed by } or ,}
+
+        Args:
+            text: Text starting after the opening quote
+            quote_char: The quote character (" or ')
+
+        Returns:
+            The extracted string content
+        """
+        # Strategy: Find all potential ending positions and pick the best one
+        # A valid ending is: quote + optional whitespace + } or quote + optional whitespace + ,
+
+        # First try: find the last occurrence of "} or "}
+        # This works because JSON object ends with }
+
+        best_end = -1
+        i = 0
+        while i < len(text):
+            if text[i] == '\\' and i + 1 < len(text):
+                # Skip escaped character
+                i += 2
                 continue
-        
+            if text[i] == quote_char:
+                # Check if this could be the end
+                rest = text[i+1:].lstrip()
+                if rest.startswith('}') or rest.startswith(','):
+                    best_end = i
+                    # Don't break - keep looking for later occurrences
+                    # But actually, for simple cases, the first valid one should work
+                    # Let's try to validate by checking if remaining text looks like end of JSON
+                    if rest.startswith('}'):
+                        # This looks like a good ending
+                        return text[:i]
+            i += 1
+
+        # If we found a potential end, use it
+        if best_end > 0:
+            return text[:best_end]
+
+        # Fallback: take everything up to the last quote before }
+        last_quote = text.rfind(quote_char)
+        if last_quote > 0:
+            return text[:last_quote]
+
+        return None
+
+    def _extract_balanced_json(self, text: str) -> Optional[str]:
+        """
+        Extract a balanced JSON object from text by counting braces.
+
+        Args:
+            text: Text starting near a JSON object
+
+        Returns:
+            Extracted JSON string or None
+        """
+        # Find the first opening brace
+        start = text.find('{')
+        if start == -1:
+            return None
+
+        brace_count = 0
+        in_string = False
+        escape_next = False
+
+        for i, char in enumerate(text[start:], start):
+            if escape_next:
+                escape_next = False
+                continue
+
+            if char == '\\':
+                escape_next = True
+                continue
+
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+
+            if in_string:
+                continue
+
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    return text[start:i+1]
+
+        # If we didn't find balanced braces, return everything from start to end
+        # This handles cases where the JSON might be truncated
+        if brace_count > 0:
+            logger.debug(f"Unbalanced braces (count={brace_count}), returning partial JSON")
+            return None
+
         return None
     
     def _execute_tool(
@@ -297,19 +446,6 @@ class MiniAgent:
             )
             return response.choices[0].message.content
         except Exception as e:
-            # Classify OpenAI exceptions if the package is available.
-            if openai is not None:
-                try:
-                    if isinstance(e, openai.APIConnectionError):
-                        logger.error(f"Connection error: {str(e)}")
-                        raise
-                    if isinstance(e, openai.APIError):
-                        logger.error(f"OpenAI API error: {str(e)}")
-                        raise
-                except Exception:
-                    # If OpenAI exception classes changed, fall back to generic handling.
-                    pass
-
             logger.error(f"Error calling LLM: {str(e)}")
             raise
     

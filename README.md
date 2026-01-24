@@ -3,38 +3,20 @@
 🚀 **5分钟手搓一个 AI Coding 助手 + 命令行版 Manus！** | [English](README_EN.md)
 
 <div align="center">
-  <img src="resouce/miniagent_word.gif" alt="Word Creation Demo" width="600"/>
-  <img src="resouce/miniagent_chrome.gif" alt="Browser Automation Demo" width="600"/>
+  <img src="resource/miniagent.png" alt="MiniAgent" width="400"/>
 </div>
 
-## 为什么选择 MiniAgent？
+## 💡 核心特性
 
-**仅用 400 行 Python 代码，复刻 Claude Code 的编程能力 + Manus 的系统操控能力！**
+**仅用 400 行 Python 核心代码，复刻 Claude Code 的编程能力 + Manus 的系统操控能力！**
 
-MiniAgent 是一个**极简的 CLI Agent 框架**，它证明了强大的 Agent 不需要复杂的架构：
+MiniAgent 是一个**极简、透明、强大的 CLI Agent 框架**，拒绝臃肿的依赖和复杂的架构：
 
 - 🧠 **Code Agent**: 像 Claude Code 一样写代码、修 Bug、跑测试
 - 🦾 **OS Agent**: 像 Manus 一样操控浏览器、编辑文档、管理应用
-- ⚡ **极简实现**: 核心逻辑仅单文件，零黑盒，完全透明可控
-
-别再当工具的使用者，成为工具的创造者。
-
-MiniAgent 具备以下核心特性：
-
-- 🖥️ **CLI 交互**：像 Claude Code 一样的终端体验，支持流式输出与思考过程展示
-- 🛠️ **Code Tools**：文件读写、代码搜索、Shell 命令执行，轻松搞定编程任务
-- 🦾 **OS 能力**：**命令行版 Manus**（低配但核心），支持**打开浏览器搜索、启动 App、操作 Word/剪贴板**
-- 🧠 **模型无关**：支持 DeepSeek、OpenAI、Claude 等任意 LLM
-- ⚡ **极简依赖**：无重框架，纯 Python 实现，零黑盒
-
-## 特色功能
-
-- **极简核心**：`agent.py` 仅 ~400 行，适合学习和魔改
-- **Claude Code 风格**：清爽的终端输出，实时显示思考过程
-- **强大工具集**：
-  - **Coding**: `read`/`write`/`edit`/`grep`/`glob`/`bash`
-  - **OS Ops**: `browser_search`/`open_app`/`create_docx`/`clipboard` 
-- **完全开源**：零黑盒，所有代码透明可控
+- ⚡ **极简实现**: 核心逻辑 (`agent.py`) 仅 400 行，完全透明可控，适合学习和魔改
+- 🤖 **全模型支持**: 完美支持 DeepSeek、OpenAI、Claude 等所有兼容 OpenAI 接口的模型
+- 🔌 **高扩展性**: 极简的装饰器模式，3行代码即可挂载自定义工具
 
 ## 快速开始
 
@@ -76,6 +58,23 @@ you: 运行一下
     → Hello World!
 🤖 运行成功！
 ```
+
+## ⚡ 演示
+
+### 1. 操控浏览器搜索
+> Prompt: "Open the browser, then search for 'zhulinsen/miniagent' on Google."
+
+<img src="resource/miniagent_chrome.gif" alt="Browser Automation Demo" width="100%"/>
+
+### 2. 自动化办公 (Word)
+> Prompt: "Write a 500-word overview of AI agents in Word and format"
+
+<img src="resource/miniagent_word.gif" alt="Word Creation Demo" width="100%"/>
+
+### 3. 代码生成 (Coding)
+> Prompt: "Create a ppo.py implementation and perform testing"
+
+<img src="resource/miniagent_coding.png" alt="Coding Demo" width="100%"/>
 
 ## 内置工具
 
@@ -120,6 +119,10 @@ def my_tool(arg: str) -> str:
 agent = MiniAgent(...)
 agent.load_builtin_tool("my_tool")
 ```
+
+## 致谢
+
+MiniAgent 的 Code Tools 设计参考了 [nanocode](https://github.com/1rgs/nanocode) 项目，感谢其优雅的极简实现思路！
 
 ## 许可证
 
