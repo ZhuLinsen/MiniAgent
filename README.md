@@ -3,14 +3,23 @@
 🚀 **5分钟手搓一个 AI Coding 助手 + 命令行版 Manus！** | [English](README_EN.md)
 
 <div align="center">
-  <img src="miniagent.png" alt="MiniAgent" width="600"/>
+  <img src="resouce/miniagent_word.gif" alt="Word Creation Demo" width="600"/>
+  <img src="resouce/miniagent_chrome.gif" alt="Browser Automation Demo" width="600"/>
 </div>
 
 ## 为什么选择 MiniAgent？
 
-不用羡慕 **Claude Code** 或 **Manus**，你也可以用 Python 快速手搓一个！
+**仅用 400 行 Python 代码，复刻 Claude Code 的编程能力 + Manus 的系统操控能力！**
 
-MiniAgent 是一个**极简的 CLI Agent 框架**，核心代码不足 500 行，但具备 AI Coding 和 OS 操控能力：
+MiniAgent 是一个**极简的 CLI Agent 框架**，它证明了强大的 Agent 不需要复杂的架构：
+
+- 🧠 **Code Agent**: 像 Claude Code 一样写代码、修 Bug、跑测试
+- 🦾 **OS Agent**: 像 Manus 一样操控浏览器、编辑文档、管理应用
+- ⚡ **极简实现**: 核心逻辑仅单文件，零黑盒，完全透明可控
+
+别再当工具的使用者，成为工具的创造者。
+
+MiniAgent 具备以下核心特性：
 
 - 🖥️ **CLI 交互**：像 Claude Code 一样的终端体验，支持流式输出与思考过程展示
 - 🛠️ **Code Tools**：文件读写、代码搜索、Shell 命令执行，轻松搞定编程任务
