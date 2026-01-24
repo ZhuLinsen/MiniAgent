@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 
 from setuptools import setup, find_packages
+from pathlib import Path
+
+# Read README with explicit UTF-8 encoding (fixes Windows GBK error)
+readme_path = Path(__file__).parent / "README.md"
+long_description = readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
 
 setup(
     name="miniagent",
@@ -18,8 +23,8 @@ setup(
     ],
     author="MiniAgent Team",
     author_email="miniagent@example.com",
-    description="A lightweight Agent framework supporting tool calls and self-reflection",
-    long_description=open("README.md").read(),
+    description="A lightweight CLI Agent framework for AI coding assistant",
+    long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ZhuLinsen/MiniAgent",
     classifiers=[
@@ -35,7 +40,6 @@ setup(
     entry_points={
         "console_scripts": [
             "miniagent=miniagent.cli:main",
-            "miniagent-gui=miniagent.gui:main",
         ]
     },
 ) 

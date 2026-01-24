@@ -9,3 +9,6 @@ jsonschema>=4.17.3
 psutil>=5.9.0
 distro>=1.8.0
 rich>=13.0.0
+
+# Optional: for creating Word documents
+# python-docx>=0.8.11

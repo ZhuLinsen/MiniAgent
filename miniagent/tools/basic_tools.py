@@ -11,6 +11,7 @@ import platform
 import subprocess
 import datetime
 import psutil
+import webbrowser
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
@@ -436,3 +437,182 @@ def system_load() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error getting system load: {str(e)}")
         raise ValueError(f"Failed to get system load information: {str(e)}")
+
+
+@register_tool
+def open_browser(url: str) -> str:
+    """
+    Open a URL in the default web browser.
+    
+    Args:
+        url: The URL to open. Can also be a search query (will use Google).
+        
+    Returns:
+        Status message
+    """
+    # If it doesn't look like a URL, treat it as a search query
+    if not url.startswith(('http://', 'https://', 'file://')):
+        url = f"https://www.google.com/search?q={requests.utils.quote(url)}"
+    
+    try:
+        webbrowser.open(url)
+        return f"Opened browser with: {url}"
+    except Exception as e:
+        raise ValueError(f"Failed to open browser: {str(e)}")
+
+
+@register_tool
+def open_app(app_name: str) -> str:
+    """
+    Open an application by name.
+    
+    Args:
+        app_name: Name of the application to open (e.g., 'notepad', 'code', 'chrome')
+        
+    Returns:
+        Status message
+    """
+    system = platform.system()
+    
+    try:
+        if system == "Windows":
+            # Common Windows app mappings
+            app_map = {
+                'notepad': 'notepad.exe',
+                'calculator': 'calc.exe',
+                'explorer': 'explorer.exe',
+                'cmd': 'cmd.exe',
+                'powershell': 'powershell.exe',
+                'chrome': 'chrome',
+                'firefox': 'firefox',
+                'edge': 'msedge',
+                'code': 'code',
+                'vscode': 'code',
+            }
+            cmd = app_map.get(app_name.lower(), app_name)
+            subprocess.Popen(cmd, shell=True)
+        elif system == "Darwin":  # macOS
+            subprocess.Popen(['open', '-a', app_name])
+        else:  # Linux
+            subprocess.Popen([app_name], start_new_session=True)
+        
+        return f"Opened application: {app_name}"
+    except Exception as e:
+        raise ValueError(f"Failed to open application '{app_name}': {str(e)}")
+
+
+@register_tool  
+def clipboard_copy(text: str) -> str:
+    """
+    Copy text to system clipboard.
+    
+    Args:
+        text: Text to copy to clipboard
+        
+    Returns:
+        Status message
+    """
+    system = platform.system()
+    
+    try:
+        if system == "Windows":
+            subprocess.run(['clip'], input=text.encode('utf-16le'), check=True)
+        elif system == "Darwin":  # macOS
+            subprocess.run(['pbcopy'], input=text.encode('utf-8'), check=True)
+        else:  # Linux
+            # Try xclip first, then xsel
+            try:
+                subprocess.run(['xclip', '-selection', 'clipboard'], input=text.encode('utf-8'), check=True)
+            except FileNotFoundError:
+                subprocess.run(['xsel', '--clipboard', '--input'], input=text.encode('utf-8'), check=True)
+        
+        return f"Copied {len(text)} characters to clipboard"
+    except Exception as e:
+        raise ValueError(f"Failed to copy to clipboard: {str(e)}")
+
+
+@register_tool
+def create_docx(path: str, content: str, title: str = "") -> str:
+    """
+    Create a Word document (.docx) with the given content.
+    Note: Requires python-docx package. If not installed, creates a .txt file instead.
+    
+    Args:
+        path: Path for the output file (will add .docx extension if needed)
+        content: Text content for the document
+        title: Optional title for the document
+        
+    Returns:
+        Status message with file path
+    """
+    # Ensure .docx extension
+    if not path.lower().endswith('.docx'):
+        path = path + '.docx'
+    
+    try:
+        from docx import Document
+        from docx.shared import Pt, Inches
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        
+        doc = Document()
+        
+        # Add title if provided
+        if title:
+            title_para = doc.add_heading(title, level=0)
+            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Split content into paragraphs and add them
+        paragraphs = content.split('\n\n')
+        for para_text in paragraphs:
+            if para_text.strip():
+                # Check if it's a heading (starts with #)
+                if para_text.startswith('# '):
+                    doc.add_heading(para_text[2:], level=1)
+                elif para_text.startswith('## '):
+                    doc.add_heading(para_text[3:], level=2)
+                elif para_text.startswith('### '):
+                    doc.add_heading(para_text[4:], level=3)
+                else:
+                    doc.add_paragraph(para_text.strip())
+        
+        doc.save(path)
+        return f"Created Word document: {path}"
+        
+    except ImportError:
+        # Fallback: create a text file with instructions
+        txt_path = path.replace('.docx', '.txt')
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            if title:
+                f.write(f"{title}\n{'='*len(title)}\n\n")
+            f.write(content)
+        return f"python-docx not installed. Created text file instead: {txt_path}\nTo create .docx files, run: pip install python-docx"
+
+
+@register_tool
+def env_get(name: str) -> str:
+    """
+    Get an environment variable value.
+    
+    Args:
+        name: Name of the environment variable
+        
+    Returns:
+        Value of the environment variable or empty string if not found
+    """
+    return os.environ.get(name, "")
+
+
+@register_tool
+def env_set(name: str, value: str) -> str:
+    """
+    Set an environment variable (for current process only).
+    
+    Args:
+        name: Name of the environment variable
+        value: Value to set
+        
+    Returns:
+        Status message
+    """
+    os.environ[name] = value
+    return f"Set environment variable: {name}={value}"

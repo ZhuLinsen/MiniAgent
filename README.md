@@ -1,158 +1,121 @@
 # MiniAgent
 
-- 🚀「5分钟从零实现LLM Agent！」 |⚡️[English Version](README_EN.md)
+🚀 **5分钟手搓一个 AI Coding 助手 + 命令行版 Manus！** | [English](README_EN.md)
 
 <div align="center">
   <img src="miniagent.png" alt="MiniAgent" width="600"/>
 </div>
 
-## 为什么选择MiniAgent？
+## 为什么选择 MiniAgent？
 
+不用羡慕 **Claude Code** 或 **Manus**，你也可以用 Python 快速手搓一个！
 
-帮助初学者，快速理解Agent原理并实现一个Agent，直观了解LLM与工具交互的细节。
+MiniAgent 是一个**极简的 CLI Agent 框架**，核心代码不足 500 行，但具备 AI Coding 和 OS 操控能力：
 
-如果这个项目对你有帮助，请给我们一个⭐️！你的支持是我们持续改进的动力。
-
+- 🖥️ **CLI 交互**：像 Claude Code 一样的终端体验，支持流式输出与思考过程展示
+- 🛠️ **Code Tools**：文件读写、代码搜索、Shell 命令执行，轻松搞定编程任务
+- 🦾 **OS 能力**：**命令行版 Manus**（低配但核心），支持**打开浏览器搜索、启动 App、操作 Word/剪贴板**
+- 🧠 **模型无关**：支持 DeepSeek、OpenAI、Claude 等任意 LLM
+- ⚡ **极简依赖**：无重框架，纯 Python 实现，零黑盒
 
 ## 特色功能
 
-MiniAgent是一个轻量级且易于使用的LLM Agent框架。以下是选择MiniAgent的理由：
-
-- **快速学习**：快速学习LLM Agent工作原理,直观了解LLM与工具交互的细节
-- **模型无关**：适用于任何LLM，即使没有原生函数调用能力，兼容OpenAI、DeepSeek、Anthropic等LLM
-- **极简设计**：专注于核心功能的清晰、可读代码
-- **轻量级**：无重依赖，易于集成和扩展
-- **简单工具集成**：通过自然语言轻松注册和调用工具
+- **极简核心**：`agent.py` 仅 ~400 行，适合学习和魔改
+- **Claude Code 风格**：清爽的终端输出，实时显示思考过程
+- **强大工具集**：
+  - **Coding**: `read`/`write`/`edit`/`grep`/`glob`/`bash`
+  - **OS Ops**: `browser_search`/`open_app`/`create_docx`/`clipboard` 
+- **完全开源**：零黑盒，所有代码透明可控
 
 ## 快速开始
-
-### 环境要求
-
-- Python 3.8+
-- 任何LLM的有效API密钥（OpenAI、DeepSeek等）
 
 ### 安装
 
 ```bash
-# 克隆仓库
 git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
-
-# 安装依赖
-python -m pip install -r requirements.txt
-
-# （推荐）把 miniagent/miniagent-gui 安装为命令
-python -m pip install -e .
+pip install -r requirements.txt
+pip install -e .  # 安装 miniagent 命令
 ```
-
-如果你不想安装命令，也可以直接用模块方式运行：
-
-```bash
-python -m miniagent
-python -m miniagent.gui
-```
-
-注意：`miniagent` / `miniagent-gui` 会安装到“当前 Python 环境”的脚本目录里；如果你在用 conda/venv，请先激活对应环境后再运行命令。
 
 ### 配置
 
-从`.env.example`文件创建项目根目录下的`.env`文件：
+创建 `.env` 文件：
 
 ```bash
-# API密钥
 LLM_API_KEY=your_api_key_here
-
-# 模型配置
 LLM_MODEL=deepseek-chat
 LLM_API_BASE=https://api.deepseek.com/v1
-LLM_TEMPERATURE=0.7
 ```
 
-### 验证LLM连接
-
-在使用MiniAgent之前，请验证您的LLM设置：
+### 运行
 
 ```bash
-# 快速验证
-python validate_llm.py
+miniagent          # 或 python -m miniagent
 ```
 
-### 基础示例
+## 使用示例
 
-运行一个简单示例：
+```
+you: 帮我创建一个 hello.py 文件
+  ● write hello.py (1 lines)
+    → ok
+🤖 已创建 hello.py 文件！
 
-```bash
-python examples/simple_example.py
+you: 运行一下
+  ● bash python hello.py
+    → Hello World!
+🤖 运行成功！
 ```
 
-## CLI 模式（新增）
+## 内置工具
 
-安装后可直接运行交互式 CLI：
+| 类别 | 工具 | 描述 |
+|---|---|---|
+| **Coding** | `read` | 读取文件内容 |
+| | `write` | 创建/覆盖文件 |
+| | `edit` | 编辑文件指定行 |
+| | `grep` | 搜索文件内容 |
+| | `glob` | 列出匹配的文件 |
+| | `bash` | 执行 Shell 命令 |
+| **OS** | `open_browser` | 打开网页或搜索 |
+| | `open_app` | 启动本地应用 (calc, notepad...) |
+| | `create_docx` | 创建 Word 文档 |
+| | `clipboard_copy`| 复制到剪贴板 |
+| **Misc** | `calculator` | 数学计算 |
 
-```bash
-miniagent
+## 项目结构
+
+```
+miniagent/
+├── agent.py      # 核心 Agent (~400行)
+├── cli.py        # 命令行界面
+├── config.py     # 配置管理
+├── tools/        # 工具集
+│   ├── code_tools.py   # 代码工具
+│   └── basic_tools.py  # 基础工具
+└── utils/        # 工具函数
 ```
 
-如果提示 `miniagent: command not found`，说明还没执行 `python -m pip install -e .`（或当前环境的 PATH 未包含脚本目录）；你也可以用：
-
-```bash
-python -m miniagent
-```
-
-内置命令：`/help`、`/c`、`/q`。
-
-## Desktop GUI（新增）
-
-使用 Tkinter（零额外依赖）：
-
-```bash
-miniagent-gui
-```
-
-## 代码工具（新增）
-
-新增 6 个 code tools：`read`/`write`/`edit`/`glob`/`grep`/`bash`（见 `miniagent/tools/code_tools.py`）。
-
-## 创建你自己的Agent
+## 自定义工具
 
 ```python
-import os
-
 from miniagent import MiniAgent
-from miniagent.config import load_config
+from miniagent.tools import register_tool
 
-# 读取环境变量 / 配置文件（默认会从环境变量读取）
-cfg = load_config()
+@register_tool
+def my_tool(arg: str) -> str:
+    """我的自定义工具"""
+    return f"处理: {arg}"
 
-agent = MiniAgent(
-  model=cfg.llm.model,
-  api_key=cfg.llm.api_key,
-  base_url=cfg.llm.api_base,
-  temperature=cfg.llm.temperature,
-  system_prompt=cfg.system_prompt,
-  use_reflector=cfg.enable_reflection,
-)
-
-# 加载内置工具（按需）
-agent.tools = []
-for name in ["calculator", "get_current_time", "read", "write", "grep"]:
-  agent.load_builtin_tool(name)
-
-print(agent.run("现在几点了？同时计算 123 * 456。"))
+agent = MiniAgent(...)
+agent.load_builtin_tool("my_tool")
 ```
-
-## 示例
-
-查看`examples/`目录获取更多详细示例：
-
-- `simple_example.py`：与任何LLM的基本用法
-- `custom_tools_example.py`：使用自定义工具
 
 ## 许可证
 
 [Apache License 2.0](LICENSE)
 
-## Star历史
+---
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ZhuLinsen/MiniAgent&type=Date)](https://www.star-history.com/#ZhuLinsen/MiniAgent&Date)
-
+⭐ 如果这个项目对你有帮助，请给个 Star！

@@ -140,6 +140,17 @@ def _tool_callback(event: str, name: str, payload: Dict[str, Any]) -> None:
             # Indent result under the tool call
             for line in result_str.split("\n")[:3]:  # Max 3 lines
                 console.print(f"    [dim]→ {line}[/dim]")
+        
+        # Restore status
+        if _current_status:
+           _current_status.start()
+
+
+def _status_callback(status_text: str) -> None:
+    """Callback for updating the status spinner text."""
+    global _current_status
+    if _current_status:
+        _current_status.update(f"[dim]{status_text}[/dim]")
 
 
 def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
@@ -231,11 +242,15 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         try:
             # Show thinking indicator
-            with console.status("[dim]thinking...[/dim]", spinner="dots") as status:
+            with console.status("[dim]Thinking...[/dim]", spinner="dots") as status:
                 global _current_status
                 _current_status = status
                 try:
-                    response = agent.run_with_tools(query, tool_callback=_tool_callback)
+                    response = agent.run_with_tools(
+                        query, 
+                        tool_callback=_tool_callback,
+                        status_callback=_status_callback
+                    )
                 finally:
                     _current_status = None
         except TypeError:

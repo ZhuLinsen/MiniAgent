@@ -318,6 +318,7 @@ class MiniAgent:
         query: str,
         max_iterations: int = 10,
         tool_callback: Optional[Callable[[str, str, Dict[str, Any]], None]] = None,
+        status_callback: Optional[Callable[[str], None]] = None,
     ) -> str:
         """
         Implement tool calling with formatted text
@@ -328,6 +329,8 @@ class MiniAgent:
         Args:
             query: User query text
             max_iterations: Maximum number of tool execution iterations
+            tool_callback: Callback for tool execution events
+            status_callback: Callback for status updates (e.g. "Thinking...", "Executing tool...")
             
         Returns:
             Final response text
@@ -377,6 +380,10 @@ class MiniAgent:
         while iteration < max_iterations:
             logger.info(f"Iteration {iteration + 1}/{max_iterations}")
             
+            # Status update: Thinking
+            if status_callback:
+                status_callback(f"Thinking (Iteration {iteration + 1})...")
+
             # Get model response
             response = self._call_llm(messages)
             messages.append({"role": "assistant", "content": response})
@@ -386,6 +393,10 @@ class MiniAgent:
             if not tool_call:
                 logger.info("No tool call in response, returning final answer")
                 return response
+            
+            # Status update: Tool execution
+            if status_callback:
+                status_callback(f"Executing tool: {tool_call['name']}...")
             
             # Execute tool
             logger.info(f"Executing tool: {tool_call['name']} with args: {tool_call['arguments']}")
