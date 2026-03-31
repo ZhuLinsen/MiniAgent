@@ -2,6 +2,7 @@
 Basic tools module providing common utility functions.
 """
 
+import re
 import requests
 import math
 import os
@@ -287,7 +288,7 @@ def http_request(
     Send an HTTP request and return the response.
     
     Args:
-        url: Request URL
+        url: Request URL (must be a public URL, private/internal addresses are blocked)
         method: Request method, default is "GET"
         headers: Request headers, default is None
         data: Request data, default is None
@@ -295,7 +296,29 @@ def http_request(
     Returns:
         HTTP response data including status code, headers, and body
     """
+    import ipaddress
+    from urllib.parse import urlparse
+    import socket
+
     logger.info(f"http_request called: {method} {url}")
+
+    # --- SSRF protection: block requests to private/internal networks ---
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            raise ValueError("Invalid URL: no hostname")
+        # Resolve hostname to IP and check if it's private
+        resolved_ips = socket.getaddrinfo(hostname, parsed.port or 80, proto=socket.IPPROTO_TCP)
+        for _family, _type, _proto, _canonname, sockaddr in resolved_ips:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                raise ValueError(
+                    f"Blocked request to private/internal address: {hostname} -> {ip}"
+                )
+    except (socket.gaierror, ValueError) as e:
+        raise ValueError(f"URL validation failed: {e}")
+
     try:
         # Prepare request parameters
         kwargs = {
@@ -491,7 +514,7 @@ def open_app(app_name: str) -> str:
                 'vscode': 'code',
             }
             cmd = app_map.get(app_name.lower(), app_name)
-            subprocess.Popen(cmd, shell=True)
+            subprocess.Popen([cmd])
         elif system == "Darwin":  # macOS
             subprocess.Popen(['open', '-a', app_name])
         else:  # Linux
@@ -617,10 +640,17 @@ def create_docx(path: str, content: str, title: str = "") -> str:
         return f"python-docx not installed. Created text file instead: {txt_path}\nTo create .docx files, run: pip install python-docx"
 
 
+# Sensitive environment variable name patterns
+_SENSITIVE_ENV_PATTERNS = re.compile(
+    r"(KEY|SECRET|PASSWORD|TOKEN|CREDENTIAL|PRIVATE)", re.IGNORECASE
+)
+
+
 @register_tool
 def env_get(name: str) -> str:
     """
     Get an environment variable value.
+    Sensitive variables (containing KEY, SECRET, PASSWORD, TOKEN, etc.) are blocked.
     
     Args:
         name: Name of the environment variable
@@ -628,6 +658,8 @@ def env_get(name: str) -> str:
     Returns:
         Value of the environment variable or empty string if not found
     """
+    if _SENSITIVE_ENV_PATTERNS.search(name):
+        return "[blocked] Cannot read sensitive environment variables"
     return os.environ.get(name, "")
 
 
@@ -635,6 +667,7 @@ def env_get(name: str) -> str:
 def env_set(name: str, value: str) -> str:
     """
     Set an environment variable (for current process only).
+    Sensitive variables (containing KEY, SECRET, PASSWORD, TOKEN, etc.) are blocked.
     
     Args:
         name: Name of the environment variable
@@ -643,5 +676,7 @@ def env_set(name: str, value: str) -> str:
     Returns:
         Status message
     """
+    if _SENSITIVE_ENV_PATTERNS.search(name):
+        return "[blocked] Cannot modify sensitive environment variables"
     os.environ[name] = value
     return f"Set environment variable: {name}={value}"

@@ -102,20 +102,26 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
         config.llm.model = env_model
     
     # Load tool execution limits from environment
-    if os.environ.get("BASH_TIMEOUT"):
-        config.bash_timeout = int(os.environ["BASH_TIMEOUT"])
-    if os.environ.get("BASH_MAX_OUTPUT"):
-        config.bash_max_output = int(os.environ["BASH_MAX_OUTPUT"])
-    if os.environ.get("TOOL_RESULT_LIMIT"):
-        config.tool_result_limit = int(os.environ["TOOL_RESULT_LIMIT"])
-    if os.environ.get("MAX_CONTEXT_MESSAGES"):
-        config.max_context_messages = int(os.environ["MAX_CONTEXT_MESSAGES"])
+    def _safe_int(key: str, default: int) -> int:
+        val = os.environ.get(key, "")
+        if not val:
+            return default
+        try:
+            return int(val)
+        except ValueError:
+            logger.warning(f"Invalid integer for {key}={val!r}, using default {default}")
+            return default
+
+    config.bash_timeout = _safe_int("BASH_TIMEOUT", config.bash_timeout)
+    config.bash_max_output = _safe_int("BASH_MAX_OUTPUT", config.bash_max_output)
+    config.tool_result_limit = _safe_int("TOOL_RESULT_LIMIT", config.tool_result_limit)
+    config.max_context_messages = _safe_int("MAX_CONTEXT_MESSAGES", config.max_context_messages)
     if os.environ.get("CONFIRM_DANGEROUS") is not None:
         config.confirm_dangerous = os.environ["CONFIRM_DANGEROUS"].lower() not in ("0", "false", "no")
     if os.environ.get("ENABLE_REFLECTION") is not None:
         config.enable_reflection = os.environ["ENABLE_REFLECTION"].lower() not in ("0", "false", "no")
     if os.environ.get("REFLECTION_MAX_ITERATIONS"):
-        config.reflection_max_iterations = int(os.environ["REFLECTION_MAX_ITERATIONS"])
+        config.reflection_max_iterations = _safe_int("REFLECTION_MAX_ITERATIONS", config.reflection_max_iterations)
         
     # Determine likely provider based on API_BASE and set appropriate default model
     if config.llm.api_base:

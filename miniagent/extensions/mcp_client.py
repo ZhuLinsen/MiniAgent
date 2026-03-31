@@ -43,10 +43,10 @@ class MCPClient:
     def start(self) -> None:
         """Start the MCP server process."""
         import os
+        import shlex
         merged_env = {**os.environ, **(self.env or {})}
         self._process = subprocess.Popen(
-            self.command,
-            shell=True,
+            shlex.split(self.command),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

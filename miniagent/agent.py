@@ -385,13 +385,13 @@ If the question is outside the scope of the available tools, use your knowledge 
                 tool_callback("end", tool_call["name"], {"error": str(e)})
             return f"Error executing tool: {str(e)}"
     
-    @retry(stop=stop_after_attempt(3), wait=wait_random_exponential(min=1, max=60))
     def _maybe_reflect(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
         """Apply reflection if enabled and conversation has history."""
         if self.use_reflector and len(messages) > 1 and self.reflector:
             return self.reflector.apply_reflection(messages)
         return messages
 
+    @retry(stop=stop_after_attempt(3), wait=wait_random_exponential(min=1, max=60))
     def _call_llm(self, messages: List[Dict[str, str]]) -> str:
         """
         Call LLM with messages
@@ -438,19 +438,19 @@ If the question is outside the scope of the available tools, use your knowledge 
         
         messages = self._maybe_reflect(messages)
         
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=self.temperature,
+            stream=True,
+        )
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=self.temperature,
-                stream=True,
-            )
             for chunk in response:
                 delta = chunk.choices[0].delta if chunk.choices else None
                 if delta and delta.content:
                     yield delta.content
         except Exception as e:
-            logger.error(f"Streaming LLM call failed: {e}")
+            logger.error(f"Streaming error during iteration: {e}")
             raise
 
     @staticmethod
@@ -485,6 +485,8 @@ If the question is outside the scope of the available tools, use your knowledge 
                 summary_parts.append(f"User asked: {content}")
             elif role == "assistant":
                 summary_parts.append(f"Assistant: {content}")
+            elif role == "tool":
+                summary_parts.append(f"Tool result: {content}")
         
         summary = "\n".join(summary_parts[-10:])  # keep last 10 entries in summary
         summary_msg = {

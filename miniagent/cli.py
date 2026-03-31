@@ -303,7 +303,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         
         def _stream_callback(token: str) -> None:
             """Print streaming tokens, but suppress if it's a tool call block."""
-            nonlocal _stream_has_tool_call
+            nonlocal _stream_has_tool_call, _stream_chunks
             _stream_chunks.append(token)
             # Detect tool call patterns early and stop printing
             partial = "".join(_stream_chunks)

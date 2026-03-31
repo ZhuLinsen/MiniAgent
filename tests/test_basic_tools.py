@@ -134,6 +134,88 @@ class TestReflectorCopy(unittest.TestCase):
         self.assertEqual(msgs[1]["content"], original_content)
 
 
+class TestEnvGetSecurity(unittest.TestCase):
+    def test_blocks_sensitive_key(self):
+        from miniagent.tools.basic_tools import env_get
+        result = env_get("LLM_API_KEY")
+        self.assertIn("blocked", result.lower())
+
+    def test_blocks_secret(self):
+        from miniagent.tools.basic_tools import env_get
+        result = env_get("MY_SECRET")
+        self.assertIn("blocked", result.lower())
+
+    def test_allows_normal_var(self):
+        from miniagent.tools.basic_tools import env_get
+        os.environ["TEST_MINIAGENT_VAR"] = "hello"
+        result = env_get("TEST_MINIAGENT_VAR")
+        self.assertEqual(result, "hello")
+        del os.environ["TEST_MINIAGENT_VAR"]
+
+
+class TestEnvSetSecurity(unittest.TestCase):
+    def test_blocks_sensitive_key(self):
+        from miniagent.tools.basic_tools import env_set
+        result = env_set("MY_TOKEN", "abc")
+        self.assertIn("blocked", result.lower())
+
+    def test_allows_normal_var(self):
+        from miniagent.tools.basic_tools import env_set
+        result = env_set("TEST_MINIAGENT_VAR2", "world")
+        self.assertEqual(os.environ.get("TEST_MINIAGENT_VAR2"), "world")
+        del os.environ["TEST_MINIAGENT_VAR2"]
+
+
+class TestHttpRequestSSRF(unittest.TestCase):
+    def test_blocks_localhost(self):
+        from miniagent.tools.basic_tools import http_request
+        with self.assertRaises(ValueError) as ctx:
+            http_request("http://127.0.0.1/secret")
+        self.assertIn("private", str(ctx.exception).lower())
+
+    def test_blocks_metadata_ip(self):
+        from miniagent.tools.basic_tools import http_request
+        with self.assertRaises(ValueError) as ctx:
+            http_request("http://169.254.169.254/latest/meta-data/")
+        err = str(ctx.exception).lower()
+        self.assertTrue("private" in err or "link" in err or "blocked" in err)
+
+    def test_blocks_internal_network(self):
+        from miniagent.tools.basic_tools import http_request
+        with self.assertRaises(ValueError) as ctx:
+            http_request("http://192.168.1.1/admin")
+        self.assertIn("private", str(ctx.exception).lower())
+
+
+class TestSummarizeToolRole(unittest.TestCase):
+    def test_tool_role_included_in_summary(self):
+        from miniagent.agent import MiniAgent
+        messages = [
+            {"role": "system", "content": "system"},
+        ]
+        for i in range(25):
+            messages.append({"role": "user", "content": f"q{i}"})
+            messages.append({"role": "assistant", "content": f"a{i}"})
+            messages.append({"role": "tool", "content": f"tool_result_{i}"})
+        result = MiniAgent._summarize_messages(messages)
+        summary_content = result[1]["content"]
+        self.assertIn("Tool result", summary_content)
+
+
+class TestConfigSafeInt(unittest.TestCase):
+    def test_invalid_int_uses_default(self):
+        with patch.dict(os.environ, {"BASH_TIMEOUT": "not_a_number"}):
+            from miniagent.config import load_config
+            cfg = load_config()
+            self.assertEqual(cfg.bash_timeout, 120)
+
+    def test_valid_int_parsed(self):
+        with patch.dict(os.environ, {"BASH_TIMEOUT": "300"}):
+            from miniagent.config import load_config
+            cfg = load_config()
+            self.assertEqual(cfg.bash_timeout, 300)
+
+
 class TestParseJsonListReturn(unittest.TestCase):
     def test_parse_json_returns_list(self):
         from miniagent.utils.json_utils import parse_json
