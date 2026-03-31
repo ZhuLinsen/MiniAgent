@@ -21,7 +21,7 @@ MiniAgent is a **minimalist, transparent, and powerful CLI Agent framework** tha
 - 🛡️ **Safety Guards**: Auto-detect and confirm dangerous commands before execution.
 - 💬 **Streaming Output**: Real-time token-by-token output with auto context compression.
 - 🔗 **MCP Protocol**: Connect to MCP tool servers to access the community ecosystem.
-- 🤝 **Multi-Agent**: Built-in orchestrator for task decomposition and role-based collaboration.
+- 🤝 **Agent Orchestration**: Built-in orchestrator with Skill-driven task decomposition and role-based collaboration.
 
 ## Design Philosophy
 

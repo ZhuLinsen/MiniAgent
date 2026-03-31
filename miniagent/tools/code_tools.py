@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import register_tool
 from ..logger import get_logger
+from ..utils.text_utils import smart_truncate
 
 logger = get_logger(__name__)
 
@@ -208,8 +209,8 @@ def bash(cmd: str, timeout: int = 120) -> Dict[str, Any]:
             env=os.environ.copy(),
             timeout=timeout,
         )
-        stdout = _smart_truncate(completed.stdout or "", MAX_OUTPUT)
-        stderr = _smart_truncate(completed.stderr or "", MAX_OUTPUT)
+        stdout = smart_truncate(completed.stdout or "", MAX_OUTPUT)
+        stderr = smart_truncate(completed.stderr or "", MAX_OUTPUT)
         return {
             "exit_code": completed.returncode,
             "stdout": stdout.strip(),
@@ -220,17 +221,3 @@ def bash(cmd: str, timeout: int = 120) -> Dict[str, Any]:
     except Exception as e:
         logger.exception("bash failed")
         return {"exit_code": 1, "stdout": "", "stderr": str(e)}
-
-
-def _smart_truncate(text: str, limit: int) -> str:
-    """Truncate text keeping both head and tail (so error info at end is preserved)."""
-    if len(text) <= limit:
-        return text
-    # Keep 70% head, 30% tail
-    head_size = int(limit * 0.7)
-    tail_size = limit - head_size - 80  # 80 chars for separator
-    return (
-        text[:head_size]
-        + f"\n\n... [truncated {len(text) - head_size - tail_size} chars, {len(text)} total] ...\n\n"
-        + text[-tail_size:]
-    )

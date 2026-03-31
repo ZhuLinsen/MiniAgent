@@ -10,26 +10,10 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 from .logger import get_logger
 from .utils.json_utils import parse_json
+from .utils.text_utils import smart_truncate
 from .tools import get_registered_tools, get_tool, get_tool_description
 
 logger = get_logger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Utility: smart truncation (head + tail)
-# ---------------------------------------------------------------------------
-
-def _smart_truncate(text: str, limit: int) -> str:
-    """Truncate text keeping both head and tail so error info at end is preserved."""
-    if len(text) <= limit:
-        return text
-    head_size = int(limit * 0.7)
-    tail_size = limit - head_size - 80
-    return (
-        text[:head_size]
-        + f"\n\n... [truncated {len(text) - head_size - tail_size} chars, {len(text)} total] ...\n\n"
-        + text[-tail_size:]
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +159,40 @@ class MiniAgent:
             List of tool names
         """
         return list(get_registered_tools().keys())
+
+    def load_skill(self, skill_name: str) -> bool:
+        """
+        Apply a registered Skill to this agent.
+        
+        Updates system_prompt, temperature, and optionally filters tools
+        to only those specified in the skill.
+        
+        Args:
+            skill_name: Name of a registered skill
+            
+        Returns:
+            True if skill was loaded successfully
+        """
+        from .skills import get_skill
+        
+        skill = get_skill(skill_name)
+        if not skill:
+            logger.warning(f"Skill not found: {skill_name}")
+            return False
+        
+        self.system_prompt = skill.prompt
+        if skill.temperature is not None:
+            self.temperature = skill.temperature
+        if skill.max_iterations is not None:
+            self._default_max_iterations = skill.max_iterations
+        
+        # Filter tools to skill whitelist
+        if skill.tools is not None:
+            self.tools = [t for t in self.tools if t["name"] in skill.tools]
+            logger.info(f"Skill '{skill_name}' filtered tools to: {[t['name'] for t in self.tools]}")
+        
+        logger.info(f"Loaded skill: {skill_name}")
+        return True
     
     def _build_tools_prompt(self) -> str:
         """
@@ -461,6 +479,41 @@ class MiniAgent:
             return answer in ("y", "yes")
         except (EOFError, KeyboardInterrupt):
             return False
+
+    # ------------------------------------------------------------------
+    # Shared helpers for both run modes
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_config_limits():
+        """Read configurable limits from environment."""
+        return (
+            int(os.environ.get("MAX_CONTEXT_MESSAGES", "20")),
+            int(os.environ.get("TOOL_RESULT_LIMIT", "16000")),
+        )
+
+    def _compress_if_needed(self, messages, max_context_messages):
+        """Compress conversation history when it exceeds the limit."""
+        if len(messages) > max_context_messages:
+            messages = self._summarize_messages(messages)
+            logger.info(f"Compressed conversation to {len(messages)} messages")
+        return messages
+
+    def _safe_execute_tool(self, tool_call, tool_callback, status_callback, limit):
+        """Execute a tool with safety check, status callbacks, and result truncation.
+        
+        Returns:
+            (result_str, rejected): result_str is None if rejected.
+        """
+        if not self._check_dangerous(tool_call):
+            return None, True
+        
+        if status_callback:
+            status_callback(f"Executing tool: {tool_call['name']}...")
+        
+        logger.info(f"Executing tool: {tool_call['name']} with args: {tool_call['arguments']}")
+        result = self._execute_tool(tool_call, tool_callback=tool_callback)
+        return smart_truncate(str(result), limit), False
     
     def run_with_tools(
         self,
@@ -527,19 +580,13 @@ class MiniAgent:
             {"role": "user", "content": query}
         ]
         
-        max_context_messages = int(os.environ.get("MAX_CONTEXT_MESSAGES", "20"))
-        limit = int(os.environ.get("TOOL_RESULT_LIMIT", "16000"))
+        max_ctx, limit = self._get_config_limits()
         
         iteration = 0
         while iteration < max_iterations:
             logger.info(f"Iteration {iteration + 1}/{max_iterations}")
+            messages = self._compress_if_needed(messages, max_ctx)
             
-            # Context management: compress if too many messages
-            if len(messages) > max_context_messages:
-                messages = self._summarize_messages(messages)
-                logger.info(f"Compressed conversation to {len(messages)} messages")
-            
-            # Status update: Thinking
             if status_callback:
                 status_callback(f"Thinking (Iteration {iteration + 1})...")
 
@@ -560,31 +607,18 @@ class MiniAgent:
                 logger.info("No tool call in response, returning final answer")
                 return response
             
-            # Safety check: confirm dangerous commands
-            if not self._check_dangerous(tool_call):
+            # Execute tool (with safety + truncation)
+            result_str, rejected = self._safe_execute_tool(tool_call, tool_callback, status_callback, limit)
+            if rejected:
                 messages.append({
                     "role": "user",
                     "content": f"Tool execution of '{tool_call['name']}' was rejected by user. Please suggest a safer alternative."
                 })
-                iteration += 1
-                continue
-            
-            # Status update: Tool execution
-            if status_callback:
-                status_callback(f"Executing tool: {tool_call['name']}...")
-            
-            # Execute tool
-            logger.info(f"Executing tool: {tool_call['name']} with args: {tool_call['arguments']}")
-            result = self._execute_tool(tool_call, tool_callback=tool_callback)
-            
-            # Truncate long tool results to prevent token overflow
-            result_str = _smart_truncate(str(result), limit)
-            
-            # Add tool result to messages
-            messages.append({
-                "role": "user",
-                "content": f"Tool execution result: {tool_call['name']} returned: {result_str}\nContinue answering the user's question, or call another tool if needed."
-            })
+            else:
+                messages.append({
+                    "role": "user",
+                    "content": f"Tool execution result: {tool_call['name']} returned: {result_str}\nContinue answering the user's question, or call another tool if needed."
+                })
             
             iteration += 1
         
@@ -613,35 +647,28 @@ class MiniAgent:
         Returns:
             Final response text
         """
-        import openai as _openai
-        
         logger.info(f"Starting native FC query: {query}")
         
         # Build OpenAI-format tool schemas
-        tool_schemas = []
-        for tool in self.tools:
-            tool_schemas.append({
-                "type": "function",
-                "function": {
-                    "name": tool["name"],
-                    "description": tool["description"],
-                    "parameters": tool.get("parameters", {"type": "object", "properties": {}}),
-                }
-            })
+        tool_schemas = [{
+            "type": "function",
+            "function": {
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": t.get("parameters", {"type": "object", "properties": {}}),
+            }
+        } for t in self.tools]
         
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": query}
         ]
         
-        max_context_messages = int(os.environ.get("MAX_CONTEXT_MESSAGES", "20"))
-        limit = int(os.environ.get("TOOL_RESULT_LIMIT", "16000"))
+        max_ctx, limit = self._get_config_limits()
         
         iteration = 0
         while iteration < max_iterations:
-            # Context management
-            if len(messages) > max_context_messages:
-                messages = self._summarize_messages(messages)
+            messages = self._compress_if_needed(messages, max_ctx)
             
             if status_callback:
                 status_callback(f"Thinking (Iteration {iteration + 1})...")
@@ -659,14 +686,11 @@ class MiniAgent:
             
             msg = response.choices[0].message
             
-            # No tool calls — return final text
             if not msg.tool_calls:
                 return msg.content or ""
             
-            # Append assistant message with tool_calls
             messages.append(msg)
             
-            # Execute each tool call
             for tc in msg.tool_calls:
                 tool_name = tc.function.name
                 try:
@@ -674,29 +698,20 @@ class MiniAgent:
                 except json.JSONDecodeError:
                     arguments = parse_json(tc.function.arguments) or {}
                 
-                if status_callback:
-                    status_callback(f"Executing tool: {tool_name}...")
-                
                 tool_call_info = {"name": tool_name, "arguments": arguments}
+                result_str, rejected = self._safe_execute_tool(
+                    tool_call_info, tool_callback, status_callback, limit
+                )
                 
-                # Safety check
-                if not self._check_dangerous(tool_call_info):
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "content": "Execution rejected by user. Please suggest a safer alternative.",
-                    })
-                    continue
-                
-                logger.info(f"Native FC executing: {tool_name} with {arguments}")
-                result = self._execute_tool(tool_call_info, tool_callback=tool_callback)
-                
-                result_str = _smart_truncate(str(result), limit)
+                if rejected:
+                    content = "Execution rejected by user. Please suggest a safer alternative."
+                else:
+                    content = result_str
                 
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
-                    "content": result_str,
+                    "content": content,
                 })
             
             iteration += 1

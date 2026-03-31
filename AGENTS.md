@@ -56,20 +56,27 @@ miniagent/
 ├── config.py       # 配置管理（.env / JSON / 环境变量）
 ├── logger.py       # 日志配置
 ├── memory.py       # 轻量会话记忆（~/.miniagent/memory.json）
-├── mcp_client.py   # MCP 协议客户端
-│                   # - stdio JSON-RPC 传输
-│                   # - 工具发现 + 调用
-│                   # - 自动转为 MiniAgent 工具格式
-├── orchestrator.py # 多 Agent 编排器
-│                   # - 任务分解（planner agent）
-│                   # - 角色分配（researcher/coder/tester/reviewer）
-│                   # - 上下文传递
+├── mcp_client.py   # MCP 客户端 re-export（→ extensions/）
+├── orchestrator.py # Agent 编排器 re-export（→ extensions/）
+├── skills.py       # Skill 系统（可复用的 Agent 配置）
+│                   # - name + prompt + tool whitelist + temperature
+│                   # - 内置: coder/researcher/reviewer/tester
+├── extensions/
+│   ├── mcp_client.py   # MCP 协议客户端实现
+│   │                   # - stdio JSON-RPC 传输
+│   │                   # - 工具发现 + 调用
+│   │                   # - 自动转为 MiniAgent 工具格式
+│   └── orchestrator.py # Agent 编排器实现
+│                       # - 任务分解（planner agent）
+│                       # - 角色分配（基于 Skill 系统）
+│                       # - 上下文传递
 ├── tools/
 │   ├── __init__.py     # 工具注册系统（@register_tool 装饰器）
 │   ├── code_tools.py   # 代码工具：read/write/edit/grep/glob/bash
 │   └── basic_tools.py  # 基础工具：calculator/time/system/browser/clipboard/docx
 └── utils/
     ├── json_utils.py   # 健壮的 JSON 解析（处理 LLM 输出的各种格式问题）
+    ├── text_utils.py   # 共享文本工具（smart_truncate）
     └── reflector.py    # 反思机制（可选，用于改善推理质量）
 ```
 

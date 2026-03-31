@@ -2,7 +2,8 @@
 
 import os
 import pytest
-from miniagent.tools.code_tools import read, write, edit, grep, glob, bash, _smart_truncate
+from miniagent.tools.code_tools import read, write, edit, grep, glob, bash
+from miniagent.utils.text_utils import smart_truncate
 
 
 @pytest.fixture
@@ -94,11 +95,11 @@ class TestBash:
 
 class TestSmartTruncate:
     def test_no_truncation_needed(self):
-        assert _smart_truncate("short text", 100) == "short text"
+        assert smart_truncate("short text", 100) == "short text"
 
     def test_truncation_preserves_head_and_tail(self):
         text = "H" * 5000 + "MIDDLE" + "T" * 5000
-        result = _smart_truncate(text, 2000)
+        result = smart_truncate(text, 2000)
         assert result.startswith("H")
         assert result.endswith("T")
         assert "truncated" in result
@@ -106,5 +107,5 @@ class TestSmartTruncate:
 
     def test_truncation_shows_total(self):
         text = "x" * 10000
-        result = _smart_truncate(text, 200)
+        result = smart_truncate(text, 200)
         assert "10000 total" in result

@@ -10,7 +10,7 @@ from typing import Any
 
 __version__ = "0.1.0"
 
-__all__ = ["MiniAgent", "Orchestrator", "load_mcp_tools", "__version__"]
+__all__ = ["MiniAgent", "Orchestrator", "load_mcp_tools", "Skill", "register_skill", "get_skill", "list_skills", "__version__"]
 
 
 def __getattr__(name: str) -> Any:
@@ -23,4 +23,7 @@ def __getattr__(name: str) -> Any:
 	if name == "load_mcp_tools":
 		from .mcp_client import load_mcp_tools
 		return load_mcp_tools
+	if name in ("Skill", "register_skill", "get_skill", "list_skills"):
+		from . import skills
+		return getattr(skills, name)
 	raise AttributeError(name)

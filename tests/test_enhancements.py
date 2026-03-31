@@ -6,7 +6,8 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 # Test the dangerous command patterns
-from miniagent.agent import _DANGEROUS_RE, _smart_truncate, MiniAgent
+from miniagent.agent import _DANGEROUS_RE, MiniAgent
+from miniagent.utils.text_utils import smart_truncate
 
 
 class TestDangerousPatterns:
@@ -76,11 +77,11 @@ class TestContextManagement:
 
 class TestSmartTruncate:
     def test_short_text_unchanged(self):
-        assert _smart_truncate("hello", 100) == "hello"
+        assert smart_truncate("hello", 100) == "hello"
 
     def test_long_text_preserves_tail(self):
         text = "START" + "x" * 10000 + "END_MARKER"
-        result = _smart_truncate(text, 500)
+        result = smart_truncate(text, 500)
         assert "END_MARKER" in result
         assert "START" in result
         assert "truncated" in result
