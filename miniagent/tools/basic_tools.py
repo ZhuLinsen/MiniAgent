@@ -3,9 +3,7 @@ Basic tools module providing common utility functions.
 """
 
 import requests
-import json
 import math
-import re
 import os
 import platform
 import subprocess
@@ -154,11 +152,7 @@ def file_stats(directory: str = ".", pattern: str = "*") -> Dict[str, Any]:
         # Get all files matching the pattern
         files = list(path.glob(pattern))
         
-        # Check if we should only count files in the current directory or recursively
-        if "**" not in pattern:
-            files = [f for f in files if f.is_file()]
-        else:
-            files = [f for f in files if f.is_file()]
+        files = [f for f in files if f.is_file()]
         
         # Calculate statistics
         total_size = sum(f.stat().st_size for f in files)
@@ -458,7 +452,8 @@ def open_browser(url: str) -> str:
     """
     # If it doesn't look like a URL, treat it as a search query
     if not url.startswith(('http://', 'https://', 'file://')):
-        url = f"https://www.google.com/search?q={requests.utils.quote(url)}"
+        from urllib.parse import quote
+        url = f"https://www.google.com/search?q={quote(url)}"
     
     try:
         webbrowser.open(url)

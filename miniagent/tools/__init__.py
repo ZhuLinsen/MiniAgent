@@ -178,19 +178,21 @@ def get_tool_description(tool: ToolFunction) -> Dict[str, Any]:
         # Check if parameter has a type annotation
         if param.annotation != inspect.Parameter.empty:
             # Convert type annotation to string
+            # Check compound types (List, Dict) BEFORE simple types
+            # to avoid e.g. List[str] matching "str" first
             type_str = str(param.annotation)
-            if "str" in type_str:
-                param_desc["type"] = "string"
+            if "List" in type_str or "list" in type_str:
+                param_desc["type"] = "array"
+            elif "Dict" in type_str or "dict" in type_str:
+                param_desc["type"] = "object"
+            elif "bool" in type_str:
+                param_desc["type"] = "boolean"
             elif "int" in type_str:
                 param_desc["type"] = "integer"
             elif "float" in type_str:
                 param_desc["type"] = "number"
-            elif "bool" in type_str:
-                param_desc["type"] = "boolean"
-            elif "List" in type_str or "list" in type_str:
-                param_desc["type"] = "array"
-            elif "Dict" in type_str or "dict" in type_str:
-                param_desc["type"] = "object"
+            elif "str" in type_str:
+                param_desc["type"] = "string"
         
         # Check if parameter has a default value
         if param.default != inspect.Parameter.empty:
