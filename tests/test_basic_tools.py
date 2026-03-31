@@ -76,14 +76,15 @@ class TestFileStats(unittest.TestCase):
 
 class TestWebSearch(unittest.TestCase):
     def test_missing_api_key(self):
-        """web_search should return error dict when SERPAPI_KEY is missing."""
+        """web_search should return error list when SERPAPI_KEY is missing."""
         with patch.dict(os.environ, {}, clear=True):
             # Ensure SERPAPI_KEY is not set
             os.environ.pop('SERPAPI_KEY', None)
             result = web_search('test query')
-            self.assertIsInstance(result, dict)
-            self.assertIn('error', result)
-            self.assertIn('SERPAPI_KEY', result['error'])
+            self.assertIsInstance(result, list)
+            self.assertEqual(len(result), 1)
+            self.assertIn('error', result[0])
+            self.assertIn('SERPAPI_KEY', result[0]['error'])
 
 
 if __name__ == '__main__':

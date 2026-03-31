@@ -112,6 +112,10 @@ If the question is outside the scope of the available tools, use your knowledge 
         self.confirm_dangerous = confirm_dangerous
         self.confirm_callback = confirm_callback
         
+        # Cache config limits (read env vars once, not per-request)
+        self._max_context_messages = int(os.environ.get("MAX_CONTEXT_MESSAGES", "20"))
+        self._tool_result_limit = int(os.environ.get("TOOL_RESULT_LIMIT", "16000"))
+        
         # Initialize the LLM client
         self._init_llm_client()
         
@@ -247,12 +251,14 @@ If the question is outside the scope of the available tools, use your knowledge 
                 required = name in params.get("required", [])
                 param_desc.append(f"    - {name}: {schema.get('description', '')} {'(required)' if required else ''}")
             
-            desc = f"""
-            Tool: {tool['name']}
-            Description: {tool['description']}
-            Parameters:
-            {chr(10).join(param_desc)}
-            """
+            params_text = "\n".join(param_desc) if param_desc else "    (none)"
+            desc = (
+                f"\n            Tool: {tool['name']}\n"
+                f"            Description: {tool['description']}\n"
+                f"            Parameters:\n"
+                f"            {params_text}\n"
+                f"            "
+            )
             tools_desc.append(desc)
         return "\n".join(tools_desc)
     
@@ -434,16 +440,20 @@ If the question is outside the scope of the available tools, use your knowledge 
         if self.use_reflector and len(messages) > 1 and self.reflector:
             messages = self.reflector.apply_reflection(messages)
         
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-            stream=True,
-        )
-        for chunk in response:
-            delta = chunk.choices[0].delta if chunk.choices else None
-            if delta and delta.content:
-                yield delta.content
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                stream=True,
+            )
+            for chunk in response:
+                delta = chunk.choices[0].delta if chunk.choices else None
+                if delta and delta.content:
+                    yield delta.content
+        except Exception as e:
+            logger.error(f"Streaming LLM call failed: {e}")
+            raise
 
     @staticmethod
     def _summarize_messages(messages: List[Dict[str, str]], keep_last: int = 6) -> List[Dict[str, str]]:
@@ -522,13 +532,9 @@ If the question is outside the scope of the available tools, use your knowledge 
     # Shared helpers for both run modes
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _get_config_limits():
-        """Read configurable limits from environment."""
-        return (
-            int(os.environ.get("MAX_CONTEXT_MESSAGES", "20")),
-            int(os.environ.get("TOOL_RESULT_LIMIT", "16000")),
-        )
+    def _get_config_limits(self):
+        """Return cached configurable limits."""
+        return self._max_context_messages, self._tool_result_limit
 
     def _compress_if_needed(self, messages, max_context_messages):
         """Compress conversation history when it exceeds the limit."""
@@ -727,7 +733,10 @@ If the question is outside the scope of the available tools, use your knowledge 
             iteration += 1
         
         logger.warning(f"Native FC reached max iterations ({max_iterations})")
-        return messages[-1].get("content", "") if isinstance(messages[-1], dict) else ""
+        last = messages[-1]
+        if isinstance(last, dict):
+            return last.get("content", "")
+        return getattr(last, "content", "") or ""
 
     def run(self, query: str, max_iterations: int = 10, mode: str = "text") -> str:
         """
