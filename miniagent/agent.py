@@ -5,7 +5,7 @@ import json
 import re
 import time
 import logging
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Union
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 from .logger import get_logger
@@ -13,6 +13,45 @@ from .utils.json_utils import parse_json
 from .tools import get_registered_tools, get_tool, get_tool_description
 
 logger = get_logger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Utility: smart truncation (head + tail)
+# ---------------------------------------------------------------------------
+
+def _smart_truncate(text: str, limit: int) -> str:
+    """Truncate text keeping both head and tail so error info at end is preserved."""
+    if len(text) <= limit:
+        return text
+    head_size = int(limit * 0.7)
+    tail_size = limit - head_size - 80
+    return (
+        text[:head_size]
+        + f"\n\n... [truncated {len(text) - head_size - tail_size} chars, {len(text)} total] ...\n\n"
+        + text[-tail_size:]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Dangerous command patterns for tool confirmation
+# ---------------------------------------------------------------------------
+
+_DANGEROUS_PATTERNS = [
+    r"\brm\s+(-[a-zA-Z]*f|-[a-zA-Z]*r|--force|--recursive)\b",  # rm -rf
+    r"\brm\s+-[a-zA-Z]*\s+/",      # rm anything under /
+    r"\bmkfs\b",                     # format filesystem
+    r"\bdd\s+",                      # disk dump
+    r":>\s*/",                       # truncate root files
+    r"\bchmod\s+-R\s+777\b",        # open permissions recursively
+    r"\bchown\s+-R\b",              # recursive ownership change
+    r">\s*/etc/",                    # overwrite system config
+    r"\bsudo\b",                     # sudo commands
+    r"\bshutdown\b|\breboot\b",     # system control
+    r"\bkill\s+-9\b",              # force kill
+    r"\bpkill\b|\bkillall\b",      # mass kill
+]
+
+_DANGEROUS_RE = re.compile("|".join(_DANGEROUS_PATTERNS), re.IGNORECASE)
 
 class MiniAgent:
     """
@@ -27,6 +66,8 @@ class MiniAgent:
         temperature: float = 0.7,
         system_prompt: str = "You are a helpful assistant that can use tools to get information and perform tasks.",
         use_reflector: bool = False,
+        confirm_dangerous: bool = False,
+        confirm_callback: Optional[Callable[[str], bool]] = None,
         **kwargs
     ):
         """
@@ -39,6 +80,8 @@ class MiniAgent:
             temperature: Model temperature
             system_prompt: System prompt to use for the agent
             use_reflector: Whether to use the Reflector to improve reasoning
+            confirm_dangerous: If True, dangerous bash commands require confirmation
+            confirm_callback: Function(cmd) -> bool for confirmation. Defaults to stdin prompt.
             **kwargs: Additional parameters for the OpenAI client
         """
         self.model = model
@@ -49,6 +92,8 @@ class MiniAgent:
         self.tools = []
         self.client = None
         self.use_reflector = use_reflector
+        self.confirm_dangerous = confirm_dangerous
+        self.confirm_callback = confirm_callback
         
         # Initialize the LLM client
         self._init_llm_client()
@@ -296,7 +341,6 @@ class MiniAgent:
             LLM response content
         """
         try:
-            # Add debug logging
             logger.debug(f"Calling LLM with API key: {self.api_key[:6]}...")
             logger.debug(f"Base URL: {self.base_url or 'default OpenAI'}")
             logger.debug(f"Model: {self.model}")
@@ -317,6 +361,106 @@ class MiniAgent:
         except Exception as e:
             logger.error(f"Error calling LLM: {str(e)}")
             raise
+
+    def _call_llm_stream(self, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
+        """
+        Call LLM with streaming, yielding tokens as they arrive.
+        
+        Args:
+            messages: Conversation messages
+            
+        Yields:
+            Token strings as they stream in
+        """
+        if not self.api_key:
+            raise ValueError("API key is not set.")
+        
+        if self.use_reflector and len(messages) > 1 and self.reflector:
+            messages = self.reflector.apply_reflection(messages)
+        
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=self.temperature,
+            stream=True,
+        )
+        for chunk in response:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
+
+    @staticmethod
+    def _summarize_messages(messages: List[Dict[str, str]], keep_last: int = 6) -> List[Dict[str, str]]:
+        """
+        Compress conversation history when it grows too long.
+        
+        Keeps the system prompt + a summary of old messages + the last N messages.
+        This prevents token overflow in long-running sessions.
+        
+        Args:
+            messages: Full message list
+            keep_last: Number of recent messages to keep verbatim
+            
+        Returns:
+            Compressed message list
+        """
+        if len(messages) <= keep_last + 2:  # system + enough messages
+            return messages
+        
+        system = messages[0] if messages[0]["role"] == "system" else None
+        start = 1 if system else 0
+        old_messages = messages[start:-keep_last]
+        recent = messages[-keep_last:]
+        
+        # Build a compact summary of old conversation
+        summary_parts = []
+        for m in old_messages:
+            role = m.get("role", "")
+            content = (m.get("content", "") or "")[:200]
+            if role == "user":
+                summary_parts.append(f"User asked: {content}")
+            elif role == "assistant":
+                summary_parts.append(f"Assistant: {content}")
+        
+        summary = "\n".join(summary_parts[-10:])  # keep last 10 entries in summary
+        summary_msg = {
+            "role": "user",
+            "content": f"[Conversation summary - {len(old_messages)} earlier messages compressed]\n{summary}\n[End of summary. Continue from here.]"
+        }
+        
+        result = []
+        if system:
+            result.append(system)
+        result.append(summary_msg)
+        result.extend(recent)
+        return result
+
+    def _check_dangerous(self, tool_call: Dict) -> bool:
+        """
+        Check if a tool call is potentially dangerous and needs confirmation.
+        
+        Returns True if the call is safe to proceed, False if user rejected.
+        """
+        if not self.confirm_dangerous:
+            return True
+        
+        if tool_call["name"] != "bash":
+            return True
+        
+        cmd = tool_call.get("arguments", {}).get("cmd", "")
+        if not _DANGEROUS_RE.search(cmd):
+            return True
+        
+        # Ask for confirmation
+        if self.confirm_callback:
+            return self.confirm_callback(cmd)
+        
+        # Default: stdin prompt
+        try:
+            answer = input(f"\n⚠️  Dangerous command detected: {cmd}\nAllow execution? [y/N]: ").strip().lower()
+            return answer in ("y", "yes")
+        except (EOFError, KeyboardInterrupt):
+            return False
     
     def run_with_tools(
         self,
@@ -324,6 +468,7 @@ class MiniAgent:
         max_iterations: int = 10,
         tool_callback: Optional[Callable[[str, str, Dict[str, Any]], None]] = None,
         status_callback: Optional[Callable[[str], None]] = None,
+        stream_callback: Optional[Callable[[str], None]] = None,
     ) -> str:
         """
         Implement tool calling with formatted text
@@ -336,6 +481,7 @@ class MiniAgent:
             max_iterations: Maximum number of tool execution iterations
             tool_callback: Callback for tool execution events
             status_callback: Callback for status updates (e.g. "Thinking...", "Executing tool...")
+            stream_callback: Callback for streaming tokens. If provided, LLM responses stream token-by-token.
             
         Returns:
             Final response text
@@ -381,16 +527,31 @@ class MiniAgent:
             {"role": "user", "content": query}
         ]
         
+        max_context_messages = int(os.environ.get("MAX_CONTEXT_MESSAGES", "20"))
+        limit = int(os.environ.get("TOOL_RESULT_LIMIT", "16000"))
+        
         iteration = 0
         while iteration < max_iterations:
             logger.info(f"Iteration {iteration + 1}/{max_iterations}")
+            
+            # Context management: compress if too many messages
+            if len(messages) > max_context_messages:
+                messages = self._summarize_messages(messages)
+                logger.info(f"Compressed conversation to {len(messages)} messages")
             
             # Status update: Thinking
             if status_callback:
                 status_callback(f"Thinking (Iteration {iteration + 1})...")
 
-            # Get model response
-            response = self._call_llm(messages)
+            # Get model response (streaming or blocking)
+            if stream_callback:
+                chunks = []
+                for token in self._call_llm_stream(messages):
+                    chunks.append(token)
+                    stream_callback(token)
+                response = "".join(chunks)
+            else:
+                response = self._call_llm(messages)
             messages.append({"role": "assistant", "content": response})
             
             # Parse tool call
@@ -398,6 +559,15 @@ class MiniAgent:
             if not tool_call:
                 logger.info("No tool call in response, returning final answer")
                 return response
+            
+            # Safety check: confirm dangerous commands
+            if not self._check_dangerous(tool_call):
+                messages.append({
+                    "role": "user",
+                    "content": f"Tool execution of '{tool_call['name']}' was rejected by user. Please suggest a safer alternative."
+                })
+                iteration += 1
+                continue
             
             # Status update: Tool execution
             if status_callback:
@@ -408,16 +578,7 @@ class MiniAgent:
             result = self._execute_tool(tool_call, tool_callback=tool_callback)
             
             # Truncate long tool results to prevent token overflow
-            result_str = str(result)
-            limit = int(os.environ.get("TOOL_RESULT_LIMIT", "16000"))
-            if len(result_str) > limit:
-                head = int(limit * 0.7)
-                tail = limit - head - 80
-                result_str = (
-                    result_str[:head]
-                    + f"\n\n... [truncated {len(result_str) - head - tail} chars, {len(result_str)} total] ...\n\n"
-                    + result_str[-tail:]
-                )
+            result_str = _smart_truncate(str(result), limit)
             
             # Add tool result to messages
             messages.append({
@@ -473,8 +634,15 @@ class MiniAgent:
             {"role": "user", "content": query}
         ]
         
+        max_context_messages = int(os.environ.get("MAX_CONTEXT_MESSAGES", "20"))
+        limit = int(os.environ.get("TOOL_RESULT_LIMIT", "16000"))
+        
         iteration = 0
         while iteration < max_iterations:
+            # Context management
+            if len(messages) > max_context_messages:
+                messages = self._summarize_messages(messages)
+            
             if status_callback:
                 status_callback(f"Thinking (Iteration {iteration + 1})...")
             
@@ -510,20 +678,20 @@ class MiniAgent:
                     status_callback(f"Executing tool: {tool_name}...")
                 
                 tool_call_info = {"name": tool_name, "arguments": arguments}
+                
+                # Safety check
+                if not self._check_dangerous(tool_call_info):
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": "Execution rejected by user. Please suggest a safer alternative.",
+                    })
+                    continue
+                
                 logger.info(f"Native FC executing: {tool_name} with {arguments}")
                 result = self._execute_tool(tool_call_info, tool_callback=tool_callback)
                 
-                # Truncate long results
-                result_str = str(result)
-                limit = int(os.environ.get("TOOL_RESULT_LIMIT", "16000"))
-                if len(result_str) > limit:
-                    head = int(limit * 0.7)
-                    tail = limit - head - 80
-                    result_str = (
-                        result_str[:head]
-                        + f"\n\n... [truncated {len(result_str) - head - tail} chars, {len(result_str)} total] ...\n\n"
-                        + result_str[-tail:]
-                    )
+                result_str = _smart_truncate(str(result), limit)
                 
                 messages.append({
                     "role": "tool",

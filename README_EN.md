@@ -18,6 +18,10 @@ MiniAgent is a **minimalist, transparent, and powerful CLI Agent framework** tha
 - 🤖 **Model Agnostic**: Perfectly supports DeepSeek, OpenAI, Claude, and any OpenAI-compatible models.
 - 🔌 **High Extensibility**: Simple decorator pattern—add custom tools in just 3 lines of code.
 - 🔄 **Dual Tool Calling**: Text parsing mode (transparent, educational) + Native Function Calling mode (reliable).
+- 🛡️ **Safety Guards**: Auto-detect and confirm dangerous commands before execution.
+- 💬 **Streaming Output**: Real-time token-by-token output with auto context compression.
+- 🔗 **MCP Protocol**: Connect to MCP tool servers to access the community ecosystem.
+- 🤝 **Multi-Agent**: Built-in orchestrator for task decomposition and role-based collaboration.
 
 ## Design Philosophy
 

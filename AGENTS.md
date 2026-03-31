@@ -42,15 +42,28 @@ miniagent/
 ├── agent.py        # 核心 Agent 循环（~400行核心函数）
 │                   # - LLM 客户端初始化
 │                   # - 工具调用解析（文本模式 + 原生 FC 模式）
+│                   # - 流式输出 (_call_llm_stream)
+│                   # - 上下文管理 (_summarize_messages)
+│                   # - 危险命令检测 (_check_dangerous)
 │                   # - 工具执行循环
 │                   # - 消息历史管理
 ├── cli.py          # 交互式命令行界面
 │                   # - Rich 美化输出
+│                   # - 流式 token 输出
 │                   # - 工具执行回调显示
+│                   # - 危险命令 Rich 确认弹窗
 │                   # - 会话记忆集成
 ├── config.py       # 配置管理（.env / JSON / 环境变量）
 ├── logger.py       # 日志配置
 ├── memory.py       # 轻量会话记忆（~/.miniagent/memory.json）
+├── mcp_client.py   # MCP 协议客户端
+│                   # - stdio JSON-RPC 传输
+│                   # - 工具发现 + 调用
+│                   # - 自动转为 MiniAgent 工具格式
+├── orchestrator.py # 多 Agent 编排器
+│                   # - 任务分解（planner agent）
+│                   # - 角色分配（researcher/coder/tester/reviewer）
+│                   # - 上下文传递
 ├── tools/
 │   ├── __init__.py     # 工具注册系统（@register_tool 装饰器）
 │   ├── code_tools.py   # 代码工具：read/write/edit/grep/glob/bash
@@ -123,6 +136,9 @@ def my_tool(arg: str) -> str:
 | `BASH_TIMEOUT` | 120 | bash 工具默认超时时间（秒） |
 | `BASH_MAX_OUTPUT` | 50000 | bash 输出最大字符数 |
 | `TOOL_RESULT_LIMIT` | 16000 | 工具结果回传给 LLM 的最大字符数 |
+| `MAX_CONTEXT_MESSAGES` | 20 | 超过此数量自动压缩对话历史 |
+| `CONFIRM_DANGEROUS` | true | 是否拦截危险 bash 命令 |
+| `MINIAGENT_STREAM` | 1 | 是否启用流式输出（0=关闭） |
 
 超出限制时使用**头+尾智能截断**（保留 70% 开头 + 30% 结尾），确保错误信息不会因截断丢失。
 

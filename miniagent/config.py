@@ -50,6 +50,8 @@ class AgentConfig:
     bash_timeout: int = 120          # BASH_TIMEOUT: bash default timeout in seconds
     bash_max_output: int = 50000     # BASH_MAX_OUTPUT: bash output truncation limit
     tool_result_limit: int = 16000   # TOOL_RESULT_LIMIT: tool result truncation limit
+    max_context_messages: int = 20   # MAX_CONTEXT_MESSAGES: auto-compress conversation after N messages
+    confirm_dangerous: bool = True   # CONFIRM_DANGEROUS: require confirmation for dangerous commands
 
 def load_config(config_path: Optional[str] = None) -> AgentConfig:
     """
@@ -107,6 +109,10 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
         config.bash_max_output = int(os.environ["BASH_MAX_OUTPUT"])
     if os.environ.get("TOOL_RESULT_LIMIT"):
         config.tool_result_limit = int(os.environ["TOOL_RESULT_LIMIT"])
+    if os.environ.get("MAX_CONTEXT_MESSAGES"):
+        config.max_context_messages = int(os.environ["MAX_CONTEXT_MESSAGES"])
+    if os.environ.get("CONFIRM_DANGEROUS") is not None:
+        config.confirm_dangerous = os.environ["CONFIRM_DANGEROUS"].lower() not in ("0", "false", "no")
         
     # Determine likely provider based on API_BASE and set appropriate default model
     if config.llm.api_base:

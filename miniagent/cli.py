@@ -172,6 +172,13 @@ def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
     if mem_ctx:
         system_prompt = system_prompt.rstrip() + "\n\n" + mem_ctx
 
+    def _confirm_dangerous(cmd: str) -> bool:
+        """Rich-formatted confirmation for dangerous commands."""
+        console.print(f"\n  [bold red]⚠️  Dangerous command detected:[/bold red]")
+        console.print(f"  [yellow]{cmd}[/yellow]")
+        answer = Prompt.ask("  [bold]Allow execution?[/bold]", choices=["y", "n"], default="n")
+        return answer.lower() == "y"
+
     agent = MiniAgent(
         model=model,
         api_key=api_key,
@@ -179,6 +186,8 @@ def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
         temperature=temperature,
         system_prompt=system_prompt,
         use_reflector=cfg.enable_reflection,
+        confirm_dangerous=cfg.confirm_dangerous,
+        confirm_callback=_confirm_dangerous,
     )
 
     # Load some default tools if configured, else fall back to all currently registered.
@@ -209,6 +218,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     console.print(f"[dim]cwd:[/dim] {os.getcwd()}")
     console.print(f"[dim]commands:[/dim] /help /c /q")
+    
+    # Streaming flag — can be toggled with /stream
+    use_streaming = os.environ.get("MINIAGENT_STREAM", "1") != "0"
 
     history: List[Dict[str, str]] = []
 
@@ -229,16 +241,37 @@ def main(argv: Optional[List[str]] = None) -> int:
             history.clear()
             console.print(f"[dim]cleared[/dim]")
             continue
+        if user_text == "/stream":
+            use_streaming = not use_streaming
+            console.print(f"[dim]streaming {'on' if use_streaming else 'off'}[/dim]")
+            continue
         if user_text in ("/help", "help"):
-            console.print("/help  show help")
-            console.print("/c     clear conversation")
-            console.print("/q     quit")
+            console.print("/help    show help")
+            console.print("/c       clear conversation")
+            console.print("/stream  toggle streaming output")
+            console.print("/q       quit")
             continue
 
         history.append({"role": "user", "content": user_text})
         memory.push("user", user_text)
 
         query = _format_history(history) + user_text
+        
+        # Prepare streaming callback
+        _stream_chunks: List[str] = []
+        _stream_has_tool_call = False
+        
+        def _stream_callback(token: str) -> None:
+            """Print streaming tokens, but suppress if it's a tool call block."""
+            nonlocal _stream_has_tool_call
+            _stream_chunks.append(token)
+            # Detect tool call patterns early and stop printing
+            partial = "".join(_stream_chunks)
+            if "TOOL:" in partial or "Tool:" in partial or "工具:" in partial:
+                _stream_has_tool_call = True
+                return
+            if not _stream_has_tool_call:
+                console.print(token, end="", highlight=False)
 
         try:
             # Show thinking indicator
@@ -249,7 +282,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                     response = agent.run_with_tools(
                         query, 
                         tool_callback=_tool_callback,
-                        status_callback=_status_callback
+                        status_callback=_status_callback,
+                        stream_callback=_stream_callback if use_streaming else None,
                     )
                 finally:
                     _current_status = None
@@ -262,6 +296,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         history.append({"role": "assistant", "content": response})
         memory.push("assistant", response)
+
+        # If streaming printed the final answer already, just add a newline
+        if use_streaming and _stream_chunks and not _stream_has_tool_call:
+            console.print()  # newline after streamed output
+            continue
 
         # Truncate overly long responses for display (keep full in history)
         display_response = response
