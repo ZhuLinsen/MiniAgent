@@ -71,7 +71,7 @@ def get_current_time() -> Dict[str, Any]:
     Returns:
         Detailed information about the current time, including ISO format, year, month, day, etc.
     """
-    print("[工具调用] 获取当前时间")
+    logger.info("[工具调用] 获取当前时间")
     now = datetime.datetime.now()
     return {
         "iso": now.isoformat(),
@@ -93,7 +93,7 @@ def system_info() -> Dict[str, Any]:
     Returns:
         Dictionary with system information like OS, version, architecture, etc.
     """
-    print("[工具调用] 获取系统信息")
+    logger.info("[工具调用] 获取系统信息")
     try:
         info = {
             "platform": platform.system(),
@@ -140,7 +140,7 @@ def file_stats(directory: str = ".", pattern: str = "*") -> Dict[str, Any]:
     Returns:
         Statistics about files including count, total size, extensions, etc.
     """
-    print(f"[工具调用] 统计文件: {directory}/{pattern}")
+    logger.info(f"[工具调用] 统计文件: {directory}/{pattern}")
     try:
         # Resolve the path to handle relative paths and symlinks
         path = Path(directory).resolve()
@@ -224,7 +224,7 @@ def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
     Returns:
         List of search results, each containing title, link, and snippet
     """
-    print(f"[工具调用] 搜索: {query}")
+    logger.info(f"[工具调用] 搜索: {query}")
     try:
         # DuckDuckGo search API endpoint
         url = "https://serpapi.com/search"
@@ -301,7 +301,7 @@ def http_request(
     Returns:
         HTTP response data including status code, headers, and body
     """
-    print(f"[工具调用] HTTP请求: {method} {url}")
+    logger.info(f"[工具调用] HTTP请求: {method} {url}")
     try:
         # Prepare request parameters
         kwargs = {
@@ -340,7 +340,7 @@ def disk_usage(path: str = "/") -> Dict[str, Any]:
     Returns:
         Dictionary containing disk usage information
     """
-    print(f"[工具调用] 检查磁盘使用情况: {path}")
+    logger.info(f"[工具调用] 检查磁盘使用情况: {path}")
     try:
         usage = psutil.disk_usage(path)
         return {
@@ -369,7 +369,7 @@ def process_list(limit: int = 10) -> List[Dict[str, Any]]:
     Returns:
         List of process information dictionaries
     """
-    print(f"[工具调用] 获取进程列表 (限制: {limit})")
+    logger.info(f"[工具调用] 获取进程列表 (限制: {limit})")
     try:
         processes = []
         for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'username']):
@@ -400,7 +400,7 @@ def system_load() -> Dict[str, Any]:
     Returns:
         Dictionary containing system load information
     """
-    print("[工具调用] 获取系统负载信息")
+    logger.info("[工具调用] 获取系统负载信息")
     try:
         # CPU usage
         cpu_percent = psutil.cpu_percent(interval=1)

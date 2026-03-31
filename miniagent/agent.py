@@ -4,8 +4,7 @@ import os
 import json
 import re
 import time
-import logging
-from typing import Any, Callable, Dict, Generator, List, Optional, Union
+from typing import Any, Callable, Dict, Generator, List, Optional
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 from .logger import get_logger
@@ -41,6 +40,39 @@ class MiniAgent:
     """
     Main MiniAgent class, providing core functionality for LLM interaction and tool calling
     """
+
+    # Template for text-mode system prompt (tools list injected at runtime)
+    _TEXT_MODE_PROMPT = """\
+{base_prompt}
+
+You are a powerful AI assistant that can use various tools to complete tasks. \
+Carefully analyze the user's request to determine if you need to use tools to solve the problem.
+
+Available tools:
+{tools_prompt}
+
+Important: When using tools, you must strictly follow this format:
+TOOL: <tool_name>
+ARGS: {{"parameter_name": "parameter_value"}}
+
+For example, when the user asks "Calculate 2 + 2", you should respond:
+TOOL: calculator
+ARGS: {{"expression": "2 + 2"}}
+
+For example, when the user asks "Create a file hello.py", you should respond:
+TOOL: write
+ARGS: {{"path": "hello.py", "content": "print('Hello World')"}}
+
+Note:
+1. You must use strict JSON format
+2. You must use double quotes for strings in JSON
+3. If the parameter value is a number, quotes are not needed
+4. After getting the tool execution result, explain the result in a concise and clear way
+5. When creating files, ALWAYS use the 'write' tool with 'path' and 'content' parameters
+6. For multi-line content, use \\n for newlines in JSON strings
+
+If you don't need to use tools, you can directly answer the user's question. \
+If the question is outside the scope of the available tools, use your knowledge to answer directly."""
     
     def __init__(
         self,
@@ -159,6 +191,11 @@ class MiniAgent:
             List of tool names
         """
         return list(get_registered_tools().keys())
+
+    def load_all_tools(self) -> None:
+        """Load all registered built-in tools into this agent."""
+        for name in self.get_available_tools():
+            self.load_builtin_tool(name)
 
     def load_skill(self, skill_name: str) -> bool:
         """
@@ -542,38 +579,10 @@ class MiniAgent:
         start_time = time.time()
         logger.info(f"Starting query processing with tools: {query}")
         
-        # Build system prompt with tools description
-        tools_prompt = self._build_tools_prompt()
-        system_prompt = f"""
-        {self.system_prompt}
-        
-        You are a powerful AI assistant that can use various tools to complete tasks. Carefully analyze the user's request to determine if you need to use tools to solve the problem.
-        
-        Available tools:
-        {tools_prompt}
-        
-        Important: When using tools, you must strictly follow this format:
-        TOOL: <tool_name>
-        ARGS: {{"parameter_name": "parameter_value"}}
-        
-        For example, when the user asks "Calculate 2 + 2", you should respond:
-        TOOL: calculator
-        ARGS: {{"expression": "2 + 2"}}
-        
-        For example, when the user asks "Create a file hello.py", you should respond:
-        TOOL: write
-        ARGS: {{"path": "hello.py", "content": "print('Hello World')"}}
-        
-        Note:
-        1. You must use strict JSON format
-        2. You must use double quotes for strings in JSON
-        3. If the parameter value is a number, quotes are not needed
-        4. After getting the tool execution result, explain the result in a concise and clear way
-        5. When creating files, ALWAYS use the 'write' tool with 'path' and 'content' parameters
-        6. For multi-line content, use \\n for newlines in JSON strings
-        
-        If you don't need to use tools, you can directly answer the user's question. If the question is outside the scope of the available tools, use your knowledge to answer directly.
-        """
+        system_prompt = self._TEXT_MODE_PROMPT.format(
+            base_prompt=self.system_prompt,
+            tools_prompt=self._build_tools_prompt(),
+        )
         
         messages = [
             {"role": "system", "content": system_prompt},

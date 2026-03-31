@@ -162,7 +162,13 @@ def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
     temperature = args.temperature if args.temperature is not None else cfg.llm.temperature
 
     if not api_key:
-        raise SystemExit("Missing API key. Set LLM_API_KEY or pass --api-key.")
+        console.print("[red]error:[/red] Missing API key.")
+        console.print("[yellow]Tip:[/yellow] Create a .env file with:")
+        console.print("  LLM_API_KEY=your_key_here")
+        console.print("  LLM_MODEL=deepseek-chat")
+        console.print("  LLM_API_BASE=https://api.deepseek.com/v1")
+        console.print("[dim]Or pass --api-key on the command line.[/dim]")
+        raise SystemExit(1)
 
     memory = Memory()
     memory.load()
@@ -200,6 +206,12 @@ def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    """Entry point for the ``miniagent`` CLI.
+    
+    Parses arguments, initialises the agent, and runs the interactive REPL.
+    Environment variables (LLM_API_KEY, LLM_MODEL, LLM_API_BASE) can be set
+    in a ``.env`` file or exported directly.
+    """
     parser = argparse.ArgumentParser(prog="miniagent", description="MiniAgent interactive CLI")
     parser.add_argument("--config", help="Path to config JSON")
     parser.add_argument("--model", help="Override model name")
@@ -217,7 +229,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 1
 
     console.print(f"[dim]cwd:[/dim] {os.getcwd()}")
-    console.print(f"[dim]commands:[/dim] /help /c /q")
+    console.print(f"[dim]commands:[/dim] /help /tools /stream /c /q")
     
     # Streaming flag — can be toggled with /stream
     use_streaming = os.environ.get("MINIAGENT_STREAM", "1") != "0"
@@ -246,10 +258,17 @@ def main(argv: Optional[List[str]] = None) -> int:
             console.print(f"[dim]streaming {'on' if use_streaming else 'off'}[/dim]")
             continue
         if user_text in ("/help", "help"):
-            console.print("/help    show help")
-            console.print("/c       clear conversation")
-            console.print("/stream  toggle streaming output")
-            console.print("/q       quit")
+            console.print("[bold]Commands:[/bold]")
+            console.print("  /help    show this help")
+            console.print("  /c       clear conversation history")
+            console.print("  /stream  toggle streaming output")
+            console.print("  /tools   list loaded tools")
+            console.print("  /q       quit")
+            console.print(f"\n[dim]streaming: {'on' if use_streaming else 'off'} | tools: {len(agent.tools)}[/dim]")
+            continue
+        if user_text == "/tools":
+            for t in agent.tools:
+                console.print(f"  [cyan]{t['name']}[/cyan] — [dim]{t['description'][:60]}[/dim]")
             continue
 
         history.append({"role": "user", "content": user_text})

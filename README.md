@@ -4,24 +4,42 @@
 
 <div align="center">
   <img src="resource/miniagent.png" alt="MiniAgent" width="400"/>
+
+  [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+  [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://python.org)
+  [![GitHub stars](https://img.shields.io/github/stars/ZhuLinsen/MiniAgent?style=social)](https://github.com/ZhuLinsen/MiniAgent)
 </div>
 
 ## 💡 核心特性
 
-**仅用 ~400 行 Python 核心函数，复刻 Claude Code 的编程能力 + Manus 的系统操控能力！**
+**一个 `agent.py` 核心文件，复刻 Claude Code 的编程能力 + Manus 的系统操控能力！**
 
 MiniAgent 是一个**极简、透明、强大的 CLI Agent 框架**，拒绝臃肿的依赖和复杂的架构：
 
 - 🧠 **Code Agent**: 像 Claude Code 一样写代码、修 Bug、跑测试
 - 🦾 **OS Agent**: 像 Manus 一样操控浏览器、编辑文档、管理应用
-- ⚡ **极简实现**: 核心逻辑 (`agent.py`) ~400 行核心函数，完全透明可控，适合学习和魔改
-- 🤖 **全模型支持**: 完美支持 DeepSeek、OpenAI、Claude 等所有兼容 OpenAI 接口的模型
-- 🔌 **高扩展性**: 极简的装饰器模式，3行代码即可挂载自定义工具
+- ⚡ **极简实现**: 核心引擎 `agent.py` 完全透明可控，适合学习和魔改
+- 🤖 **全模型支持**: DeepSeek、OpenAI、Claude 等所有兼容 OpenAI 接口的模型
+- 🔌 **高扩展性**: 极简装饰器模式，3行代码即可挂载自定义工具
 - 🔄 **双模式工具调用**: 文本解析模式（透明可学习）+ 原生 Function Calling 模式（更可靠）
+- 🎯 **Skill 系统**: 可复用的 Agent 配置，内置 coder/researcher/reviewer/tester 四个角色
 - 🛡️ **安全防护**: 危险命令自动拦截确认，防止 LLM 幻觉导致破坏性操作
 - 💬 **流式输出**: 打字机效果实时输出，长对话自动压缩上下文
 - 🔗 **MCP 协议**: 支持连接 MCP 工具服务器，接入社区生态
-- 🤝 **Agent 编排**: 内置编排器，支持任务分解 + 多角色协同（Skill 驱动）
+- 🤝 **Agent 编排**: 内置编排器，支持任务分解 + 多角色协同
+
+## 🤔 Why MiniAgent?
+
+| | MiniAgent | smolagents | pydantic-ai | LangChain |
+|---|---|---|---|---|
+| **核心定位** | CLI Agent 教科书 | HuggingFace 生态 | 企业级类型安全 | 万能框架 |
+| **核心代码** | 单文件可读 | ~1,000行 | 182MB | 10万+行 |
+| **工具调用** | 文本解析 + 原生FC | Code Agent | 原生FC | 多层抽象 |
+| **学习曲线** | ⭐ 30分钟上手 | ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| **依赖** | 7个 | ~20个 | ~15个 | 50+ |
+| **OS 控制** | bash 万能 | 需扩展 | 需扩展 | 需插件 |
+
+> **MiniAgent 的独特价值：最好的 AI Agent 教科书。** 没有魔法、没有抽象，初学者可以完全理解 Agent 是如何工作的。
 
 ## 设计哲学
 
@@ -119,17 +137,20 @@ you: 运行一下
 
 ```
 miniagent/
-├── agent.py        # 核心 Agent（~400行核心函数）
-├── cli.py          # 命令行界面（流式输出）
-├── config.py       # 配置管理
-├── memory.py       # 会话记忆
-├── mcp_client.py   # MCP 协议客户端
-├── orchestrator.py # Agent 编排器（→ extensions/）
+├── agent.py        # 核心 Agent 引擎（LLM 交互 + 工具调用循环）
+├── cli.py          # 交互式命令行界面（Rich 格式化 + 流式输出）
+├── config.py       # 配置管理（.env + JSON + 环境变量）
 ├── skills.py       # Skill 系统（可复用的 Agent 配置）
+├── memory.py       # 轻量会话记忆
+├── extensions/     # 可选扩展
+│   ├── mcp_client.py   # MCP 协议客户端
+│   └── orchestrator.py # Agent 编排器
 ├── tools/          # 工具集
 │   ├── code_tools.py   # 代码工具 (read/write/edit/grep/glob/bash)
 │   └── basic_tools.py  # 基础工具 (calculator/browser/clipboard/docx...)
 └── utils/          # 工具函数
+    ├── json_utils.py   # JSON 解析
+    └── text_utils.py   # 文本处理
 ```
 
 ## 双模式工具调用
@@ -212,14 +233,16 @@ agent.load_builtin_tool("my_tool")
 
 ## 与同类项目对比
 
-| 特点 | MiniAgent | nanocode | LangChain |
-|------|-----------|---------|-----------|
-| 核心代码 | ~400行核心函数 | ~271行单文件 | 10万+行 |
-| 工具调用 | 文本解析 + 原生FC 双模式 | 仅原生FC | 多层抽象 |
-| 可读性 | ⭐⭐⭐⭐⭐ 初学者友好 | ⭐⭐⭐⭐ 紧凑 | ⭐⭐ 复杂 |
-| OS 控制 | bash 万能 + 专用工具 | 仅 bash | 需插件 |
-| 教学价值 | 最好的 Agent 教科书 | 过于紧凑 | 过于复杂 |
-| 模型支持 | 全模型兼容 | Claude 为主 | 全模型 |
+| 特点 | MiniAgent | smolagents | pydantic-ai | LangChain |
+|------|-----------|-----------|------------|-----------|
+| 核心代码 | 单文件可读 | ~1,000行 | 182MB | 10万+行 |
+| 工具调用 | 文本解析 + 原生FC 双模式 | Code Agent | 原生FC | 多层抽象 |
+| 可读性 | ⭐⭐⭐⭐⭐ 初学者友好 | ⭐⭐⭐⭐ 紧凑 | ⭐⭐⭐ 企业级 | ⭐⭐ 复杂 |
+| OS 控制 | bash 万能 + 专用工具 | 需扩展 | 需扩展 | 需插件 |
+| 教学价值 | 最好的 Agent 教科书 | HuggingFace 生态强 | 类型安全最佳 | 过于复杂 |
+| 模型支持 | 全模型兼容 | 全模型 | 全模型 | 全模型 |
+| Skill 系统 | ✅ 内置 | ❌ | ❌ | ❌ |
+| MCP 支持 | ✅ | ❌ | ✅ | 需插件 |
 
 ## 致谢
 

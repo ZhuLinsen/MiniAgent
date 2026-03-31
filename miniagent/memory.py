@@ -26,6 +26,11 @@ def _default_memory_path() -> Path:
 
 @dataclass
 class Memory:
+    """Lightweight session memory persisted as a JSON file.
+    
+    Stores user preferences, facts, and recent conversation history.
+    Automatically trims old messages beyond ``max_messages``.
+    """
     path: Path = field(default_factory=_default_memory_path)
     max_messages: int = 40
 
@@ -34,6 +39,7 @@ class Memory:
     messages: List[Dict[str, str]] = field(default_factory=list)
 
     def load(self) -> None:
+        """Load memory from the JSON file on disk (no-op if file missing)."""
         if not self.path.exists():
             return
         try:
@@ -45,6 +51,7 @@ class Memory:
             logger.exception("Failed to load memory")
 
     def save(self) -> None:
+        """Persist current memory state to the JSON file."""
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             payload = {
@@ -58,14 +65,17 @@ class Memory:
             logger.exception("Failed to save memory")
 
     def set_preference(self, key: str, value: Any) -> None:
+        """Store a user preference and auto-save."""
         self.preferences[key] = value
         self.save()
 
     def set_fact(self, key: str, value: Any) -> None:
+        """Store a user fact and auto-save."""
         self.facts[key] = value
         self.save()
 
     def push(self, role: str, content: str) -> None:
+        """Append a message and auto-save, trimming to ``max_messages``."""
         if not content:
             return
         self.messages.append({"role": role, "content": content})
