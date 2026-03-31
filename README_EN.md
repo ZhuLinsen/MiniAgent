@@ -8,15 +8,26 @@
 
 ## 💡 Core Features
 
-**400 lines of Python code to replicate Claude Code's coding capabilities + Manus's OS control capabilities!**
+**~400 lines of core Python functions to replicate Claude Code's coding capabilities + Manus's OS control capabilities!**
 
 MiniAgent is a **minimalist, transparent, and powerful CLI Agent framework** that rejects bloated dependencies and complex architectures:
 
 - 🧠 **Code Agent**: Write code, fix bugs, and run tests like Claude Code.
 - 🦾 **OS Agent**: Control browsers, edit documents, and manage apps like Manus.
-- ⚡ **Minimalist**: Core logic (`agent.py`) is only ~400 lines. Fully transparent and hackable.
+- ⚡ **Minimalist**: Core logic (`agent.py`) is ~400 lines of core functions. Fully transparent and hackable.
 - 🤖 **Model Agnostic**: Perfectly supports DeepSeek, OpenAI, Claude, and any OpenAI-compatible models.
 - 🔌 **High Extensibility**: Simple decorator pattern—add custom tools in just 3 lines of code.
+- 🔄 **Dual Tool Calling**: Text parsing mode (transparent, educational) + Native Function Calling mode (reliable).
+
+## Design Philosophy
+
+> **MiniAgent doesn't ship 100 built-in tools. Instead, it uses 6 code tools + bash to achieve unlimited capabilities.**
+
+- Need a screenshot? The LLM will `bash: python -c "from mss import mss; mss().shot()"`
+- Need mouse control? The LLM will `bash: python -c "import pyautogui; pyautogui.click(100,200)"`
+- Need web scraping? The LLM will `bash: curl ... | python -c "..."`
+
+That's the power of minimalism: let the LLM do what it does best — **think and compose**.
 
 ## ⚡ Examples
 
@@ -71,12 +82,43 @@ miniagent          # or python -m miniagent
 | | `edit` | Edit specific lines in file |
 | | `grep` | Search file content |
 | | `glob` | List matching files |
-| | `bash` | Execute Shell commands |
+| | `bash` | Execute Shell commands (with timeout) |
 | **OS** | `open_browser` | Open web page or search |
 | | `open_app` | Launch local apps (calc, notepad...) |
 | | `create_docx` | Create Word documents |
 | | `clipboard_copy`| Copy to clipboard |
-| **Misc** | `calculator` | Mathematical context |
+| | `clipboard_read`| Read clipboard content |
+| **System** | `system_info` | System information |
+| | `system_load` | CPU/memory/disk load |
+| | `process_list` | Process listing |
+| **Misc** | `calculator` | Math (AST-safe evaluation) |
+| | `get_current_time` | Current time |
+
+## Dual Tool Calling Modes
+
+MiniAgent supports two tool calling modes for learning and comparison:
+
+### Text Mode (Default)
+The LLM outputs structured text in its response, and the Agent parses it — **fully transparent, best for learning**:
+```python
+agent.run("Calculate 2+2")  # default text mode
+```
+
+### Native Function Calling Mode
+Uses OpenAI-compatible `tools` parameter — **more reliable, supports parallel tool calls**:
+```python
+agent.run("Calculate 2+2", mode="native")  # native FC mode
+```
+
+## Comparison with Similar Projects
+
+| Feature | MiniAgent | nanocode | LangChain |
+|---------|-----------|---------|-----------|
+| Core Code | ~400 line functions | ~271 line single file | 100K+ lines |
+| Tool Calling | Text + Native FC dual mode | Native FC only | Multi-layer abstraction |
+| Readability | ⭐⭐⭐⭐⭐ Beginner-friendly | ⭐⭐⭐⭐ Compact | ⭐⭐ Complex |
+| OS Control | Universal bash + dedicated tools | bash only | Needs plugins |
+| Learning Value | Best Agent textbook | Too compact | Too complex |
 
 ## License
 

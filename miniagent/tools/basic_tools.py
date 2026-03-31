@@ -21,41 +21,47 @@ from ..logger import get_logger
 logger = get_logger(__name__)
 
 @register_tool
-def calculator(expression: str) -> float:
+def calculator(expression: str) -> Dict[str, Any]:
     """
     Calculate the result of a mathematical expression.
-    
+    Uses AST parsing for safety — only allows arithmetic and math functions.
+
     Args:
-        expression: The mathematical expression to calculate, e.g., "2 + 2 * 3"
-        
+        expression: The mathematical expression to calculate, e.g., "2 + 2 * 3", "sqrt(16)", "sin(pi/2)"
+
     Returns:
-        The calculation result
+        Dictionary containing the expression and result
     """
-    print(f"[工具调用] 计算表达式: {expression}")
-    # Replace mathematical function names with methods from the math module
-    allowed_names = {
-        'sin': math.sin,
-        'cos': math.cos,
-        'tan': math.tan,
-        'sqrt': math.sqrt,
-        'pow': math.pow,
-        'exp': math.exp,
-        'log': math.log,
-        'log10': math.log10,
-        'pi': math.pi,
-        'e': math.e
+    import ast as _ast
+
+    safe_dict = {
+        'abs': abs, 'pow': pow, 'round': round, 'min': min, 'max': max,
+        'int': int, 'float': float,
+        'sin': math.sin, 'cos': math.cos, 'tan': math.tan,
+        'asin': math.asin, 'acos': math.acos, 'atan': math.atan,
+        'sinh': math.sinh, 'cosh': math.cosh, 'tanh': math.tanh,
+        'exp': math.exp, 'log': math.log, 'log10': math.log10,
+        'sqrt': math.sqrt, 'ceil': math.ceil, 'floor': math.floor,
+        'degrees': math.degrees, 'radians': math.radians,
+        'pi': math.pi, 'e': math.e,
     }
-    
-    # For safety, clean unsafe characters from the expression
-    expression = re.sub(r'[^\d+\-*/().a-zA-Z]', '', expression)
-    
-    # Execute calculation
+    allowed_funcs = set(safe_dict.keys()) - {'pi', 'e'}
+
+    def _check_node(node):
+        if isinstance(node, _ast.Call):
+            if not (isinstance(node.func, _ast.Name) and node.func.id in allowed_funcs):
+                raise ValueError(f"Function not allowed: {_ast.dump(node.func)}")
+        for child in _ast.iter_child_nodes(node):
+            _check_node(child)
+
     try:
-        # Use eval to calculate the expression, providing a safe context
-        result = eval(expression, {"__builtins__": {}}, allowed_names)
-        return float(result)
+        expression = expression.strip()
+        tree = _ast.parse(expression, mode='eval')
+        _check_node(tree.body)
+        result = eval(compile(tree, '<string>', 'eval'), {"__builtins__": {}}, safe_dict)
+        return {"expression": expression, "result": result}
     except Exception as e:
-        raise ValueError(f"Failed to calculate expression '{expression}': {str(e)}")
+        return {"expression": expression, "error": f"Error: {str(e)}"}
 
 @register_tool
 def get_current_time() -> Dict[str, Any]:
@@ -529,6 +535,34 @@ def clipboard_copy(text: str) -> str:
         return f"Copied {len(text)} characters to clipboard"
     except Exception as e:
         raise ValueError(f"Failed to copy to clipboard: {str(e)}")
+
+
+@register_tool
+def clipboard_read() -> str:
+    """
+    Read text content from system clipboard.
+
+    Returns:
+        Text content from clipboard
+    """
+    system = platform.system()
+
+    try:
+        if system == "Windows":
+            result = subprocess.run(['powershell', '-command', 'Get-Clipboard'], capture_output=True, text=True, check=True)
+            return result.stdout.rstrip('\r\n')
+        elif system == "Darwin":  # macOS
+            result = subprocess.run(['pbpaste'], capture_output=True, text=True, check=True)
+            return result.stdout
+        else:  # Linux
+            try:
+                result = subprocess.run(['xclip', '-selection', 'clipboard', '-o'], capture_output=True, text=True, check=True)
+                return result.stdout
+            except FileNotFoundError:
+                result = subprocess.run(['xsel', '--clipboard', '--output'], capture_output=True, text=True, check=True)
+                return result.stdout
+    except Exception as e:
+        raise ValueError(f"Failed to read clipboard: {str(e)}")
 
 
 @register_tool

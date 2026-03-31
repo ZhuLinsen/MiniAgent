@@ -62,48 +62,19 @@ class MiniAgent:
         logger.info(f"MiniAgent initialized, model: {model}, base URL: {base_url or 'default'}, temperature: {temperature}, reflector: {use_reflector}")
     
     def _init_llm_client(self):
-        """Initialize the appropriate LLM client based on the model name"""
-        if "gpt" in self.model.lower() or "openai" in self.model.lower():
-            self._init_openai_client()
-        elif "deepseek" in self.model.lower():
-            self._init_deepseek_client()
-        else:
-            # Default to OpenAI for unknown models
-            logger.warning(f"Unknown model type: {self.model}, defaulting to OpenAI client")
-            self._init_openai_client()
-    
-    def _init_openai_client(self):
-        """Initialize OpenAI client"""
+        """Initialize the LLM client (OpenAI-compatible for all providers)"""
         try:
             import openai as _openai
-
             self.client = _openai.OpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url
             )
-            logger.info(f"OpenAI client initialized with model: {self.model}")
+            logger.info(f"LLM client initialized: model={self.model}, base_url={self.base_url or 'default'}")
         except ImportError:
             logger.error("OpenAI package not installed. Please install it with 'pip install openai'")
             raise
         except Exception as e:
-            logger.error(f"Failed to initialize OpenAI client: {e}")
-            raise
-    
-    def _init_deepseek_client(self):
-        """Initialize DeepSeek client"""
-        try:
-            import openai as _openai
-
-            self.client = _openai.OpenAI(
-                api_key=self.api_key,
-                base_url=self.base_url or "https://api.deepseek.com/v1"
-            )
-            logger.info(f"DeepSeek client initialized with model: {self.model}")
-        except ImportError:
-            logger.error("OpenAI package not installed. Please install it with 'pip install openai'")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to initialize DeepSeek client: {e}")
+            logger.error(f"Failed to initialize LLM client: {e}")
             raise
     
     def add_tool(self, tool: Dict[str, Any]) -> None:
@@ -186,7 +157,11 @@ class MiniAgent:
     
     def _parse_tool_call(self, content: str) -> Optional[Dict]:
         """
-        Parse tool call from LLM response
+        Parse tool call from LLM response.
+
+        Supports two text patterns:
+          1. TOOL: <name>  ARGS: {json}
+          2. Tool/工具: <name>  Args/参数: {json}
 
         Args:
             content: LLM response content
@@ -196,143 +171,37 @@ class MiniAgent:
         """
         logger.debug(f"Parsing tool call from content (length={len(content)})")
 
-        # First, try to find TOOL: pattern and extract tool name
+        # Two clean patterns: strict and relaxed
         tool_name_patterns = [
             r"TOOL:\s*(\w+)\s*ARGS:\s*",
-            r"TOL:\s*(\w+)\s*ARGS:\s*",
-            r"使用工具:\s*(\w+)\s*参数:\s*",
-            r"USE TOOL:\s*(\w+)\s*WITH ARGS:\s*",
-            r"工具名称:\s*(\w+)\s*工具参数:\s*",
-            r"Tool:\s*(\w+)\s*Args:\s*",
-            r"Tool:\s*(\w+)\s*Arguments:\s*"
+            r"(?:Tool|工具|USE TOOL|使用工具|工具名称|TOL):\s*(\w+)\s*(?:Args|参数|WITH ARGS|工具参数|Arguments):\s*",
         ]
 
         for pattern in tool_name_patterns:
             match = re.search(pattern, content, re.DOTALL)
             if match:
                 name = match.group(1)
-                # Find the start of JSON after the pattern
-                json_start = match.end()
-                remaining = content[json_start:]
-
-                # For write tool with content, use special extraction
-                if name == "write":
-                    args = self._extract_write_args(remaining)
-                    if args:
-                        logger.info(f"Parsed write tool call with path: {args.get('path', 'unknown')}")
-                        return {"name": name, "arguments": args}
+                remaining = content[match.end():]
 
                 # Extract balanced JSON using brace counting
                 args_str = self._extract_balanced_json(remaining)
+                if not args_str:
+                    continue
 
-                if args_str:
-                    logger.debug(f"Matched tool '{name}', args length={len(args_str)}")
+                logger.debug(f"Matched tool '{name}', args length={len(args_str)}")
 
-                    # First try strict parsing
-                    try:
-                        return {
-                            "name": name,
-                            "arguments": json.loads(args_str)
-                        }
-                    except json.JSONDecodeError as e:
-                        logger.debug(f"Strict JSON parse failed: {e}")
-
-                    # Then try loose parsing via json_utils
+                # Try strict parse first, then loose
+                try:
+                    return {"name": name, "arguments": json.loads(args_str)}
+                except json.JSONDecodeError:
                     args = parse_json(args_str)
                     if args:
                         logger.info(f"Parsed tool call: {name} with {len(args)} args")
-                        return {
-                            "name": name,
-                            "arguments": args
-                        }
+                        return {"name": name, "arguments": args}
 
-                    logger.warning(f"Failed to parse tool arguments for {name}: {args_str[:100]}...")
+                logger.warning(f"Failed to parse tool arguments for {name}: {args_str[:100]}...")
 
         logger.debug("No tool call pattern matched")
-        return None
-
-    def _extract_write_args(self, text: str) -> Optional[Dict]:
-        """
-        Extract arguments for write tool, handling complex content with unescaped quotes.
-
-        Args:
-            text: Text containing the JSON arguments
-
-        Returns:
-            Dictionary with 'path' and 'content' keys, or None
-        """
-        # Find path field
-        path_match = re.search(r'["\']path["\']\s*:\s*["\']([^"\']+)["\']', text)
-        if not path_match:
-            return None
-
-        path = path_match.group(1)
-
-        # Find content field - look for "content": " or 'content': '
-        content_match = re.search(r'["\']content["\']\s*:\s*["\']', text)
-        if not content_match:
-            return None
-
-        content_start = content_match.end()
-        quote_char = text[content_match.end() - 1]  # The quote character used
-
-        # Find the end of content - look for closing pattern
-        # The content ends with quote + } or quote + , + }
-        # We need to find the LAST occurrence of "} or '}
-        content = self._extract_string_value(text[content_start:], quote_char)
-
-        if content is not None:
-            return {"path": path, "content": content}
-
-        return None
-
-    def _extract_string_value(self, text: str, quote_char: str) -> Optional[str]:
-        """
-        Extract a string value that may contain unescaped quotes.
-        Looks for the closing pattern: quote followed by } or ,}
-
-        Args:
-            text: Text starting after the opening quote
-            quote_char: The quote character (" or ')
-
-        Returns:
-            The extracted string content
-        """
-        # Strategy: Find all potential ending positions and pick the best one
-        # A valid ending is: quote + optional whitespace + } or quote + optional whitespace + ,
-
-        # First try: find the last occurrence of "} or "}
-        # This works because JSON object ends with }
-
-        best_end = -1
-        i = 0
-        while i < len(text):
-            if text[i] == '\\' and i + 1 < len(text):
-                # Skip escaped character
-                i += 2
-                continue
-            if text[i] == quote_char:
-                # Check if this could be the end
-                rest = text[i+1:].lstrip()
-                if rest.startswith('}') or rest.startswith(','):
-                    best_end = i
-                    # Don't break - keep looking for later occurrences
-                    # But actually, for simple cases, the first valid one should work
-                    # Let's try to validate by checking if remaining text looks like end of JSON
-                    if rest.startswith('}'):
-                        # This looks like a good ending
-                        return text[:i]
-            i += 1
-
-        # If we found a potential end, use it
-        if best_end > 0:
-            return text[:best_end]
-
-        # Fallback: take everything up to the last quote before }
-        last_quote = text.rfind(quote_char)
-        if last_quote > 0:
-            return text[:last_quote]
-
         return None
 
     def _extract_balanced_json(self, text: str) -> Optional[str]:
@@ -538,10 +407,15 @@ class MiniAgent:
             logger.info(f"Executing tool: {tool_call['name']} with args: {tool_call['arguments']}")
             result = self._execute_tool(tool_call, tool_callback=tool_callback)
             
+            # Truncate long tool results to prevent token overflow
+            result_str = str(result)
+            if len(result_str) > 4000:
+                result_str = result_str[:4000] + f"\n... [truncated, {len(result_str)} chars total]"
+            
             # Add tool result to messages
             messages.append({
                 "role": "user",
-                "content": f"Tool execution result: {tool_call['name']} returned: {result}\nContinue answering the user's question, or call another tool if needed."
+                "content": f"Tool execution result: {tool_call['name']} returned: {result_str}\nContinue answering the user's question, or call another tool if needed."
             })
             
             iteration += 1
@@ -549,18 +423,118 @@ class MiniAgent:
         logger.warning(f"Reached maximum iterations ({max_iterations})")
         return messages[-1]["content"]
 
-    def run(self, query: str, max_iterations: int = 10) -> str:
+    def run_with_native_tools(
+        self,
+        query: str,
+        max_iterations: int = 10,
+        tool_callback: Optional[Callable[[str, str, Dict[str, Any]], None]] = None,
+        status_callback: Optional[Callable[[str], None]] = None,
+    ) -> str:
         """
-        Execute the default Agent tool calling method
+        Run agent using OpenAI native function calling (tools parameter).
         
-        This is the main entry method for MiniAgent, using formatted text to implement tool calling.
-        The method parses and executes tool call instructions from the model output.
+        This is the alternative to run_with_tools() for models that support native FC.
+        More reliable parsing, supports parallel tool calls.
+        
+        Args:
+            query: User query text
+            max_iterations: Maximum number of tool execution iterations
+            tool_callback: Callback for tool execution events
+            status_callback: Callback for status updates
+            
+        Returns:
+            Final response text
+        """
+        import openai as _openai
+        
+        logger.info(f"Starting native FC query: {query}")
+        
+        # Build OpenAI-format tool schemas
+        tool_schemas = []
+        for tool in self.tools:
+            tool_schemas.append({
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "parameters": tool.get("parameters", {"type": "object", "properties": {}}),
+                }
+            })
+        
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": query}
+        ]
+        
+        iteration = 0
+        while iteration < max_iterations:
+            if status_callback:
+                status_callback(f"Thinking (Iteration {iteration + 1})...")
+            
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=self.temperature,
+                    tools=tool_schemas if tool_schemas else None,
+                )
+            except Exception as e:
+                logger.error(f"Native FC LLM call failed: {e}")
+                raise
+            
+            msg = response.choices[0].message
+            
+            # No tool calls — return final text
+            if not msg.tool_calls:
+                return msg.content or ""
+            
+            # Append assistant message with tool_calls
+            messages.append(msg)
+            
+            # Execute each tool call
+            for tc in msg.tool_calls:
+                tool_name = tc.function.name
+                try:
+                    arguments = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    arguments = parse_json(tc.function.arguments) or {}
+                
+                if status_callback:
+                    status_callback(f"Executing tool: {tool_name}...")
+                
+                tool_call_info = {"name": tool_name, "arguments": arguments}
+                logger.info(f"Native FC executing: {tool_name} with {arguments}")
+                result = self._execute_tool(tool_call_info, tool_callback=tool_callback)
+                
+                # Truncate long results
+                result_str = str(result)
+                if len(result_str) > 4000:
+                    result_str = result_str[:4000] + f"\n... [truncated, {len(result_str)} chars total]"
+                
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result_str,
+                })
+            
+            iteration += 1
+        
+        logger.warning(f"Native FC reached max iterations ({max_iterations})")
+        return messages[-1].get("content", "") if isinstance(messages[-1], dict) else ""
+
+    def run(self, query: str, max_iterations: int = 10, mode: str = "text") -> str:
+        """
+        Execute the Agent with specified tool calling mode.
         
         Args:
             query: User query text
             max_iterations: Maximum number of iterations
+            mode: Tool calling mode — "text" (default, transparent parsing) 
+                  or "native" (OpenAI function calling)
             
         Returns:
             Agent response text
         """
+        if mode == "native":
+            return self.run_with_native_tools(query, max_iterations)
         return self.run_with_tools(query, max_iterations)

@@ -187,15 +187,17 @@ def grep(pattern: str, path: str = ".") -> List[Dict[str, Any]]:  # noqa: A002
 
 
 @register_tool
-def bash(cmd: str) -> Dict[str, Any]:
+def bash(cmd: str, timeout: int = 30) -> Dict[str, Any]:
     """Execute a shell command.
 
     Args:
         cmd: Shell command string.
+        timeout: Maximum execution time in seconds (default 30).
 
     Returns:
         Dict containing exit_code, stdout, stderr.
     """
+    MAX_OUTPUT = 10000
     try:
         completed = subprocess.run(
             cmd,
@@ -204,12 +206,21 @@ def bash(cmd: str) -> Dict[str, Any]:
             capture_output=True,
             cwd=os.getcwd(),
             env=os.environ.copy(),
+            timeout=timeout,
         )
+        stdout = (completed.stdout or "").strip()
+        stderr = (completed.stderr or "").strip()
+        if len(stdout) > MAX_OUTPUT:
+            stdout = stdout[:MAX_OUTPUT] + f"\n... [truncated, {len(stdout)} chars total]"
+        if len(stderr) > MAX_OUTPUT:
+            stderr = stderr[:MAX_OUTPUT] + f"\n... [truncated, {len(stderr)} chars total]"
         return {
             "exit_code": completed.returncode,
-            "stdout": (completed.stdout or "").strip(),
-            "stderr": (completed.stderr or "").strip(),
+            "stdout": stdout,
+            "stderr": stderr,
         }
+    except subprocess.TimeoutExpired:
+        return {"exit_code": 1, "stdout": "", "stderr": f"Command timed out after {timeout}s"}
     except Exception as e:
         logger.exception("bash failed")
         return {"exit_code": 1, "stdout": "", "stderr": str(e)}

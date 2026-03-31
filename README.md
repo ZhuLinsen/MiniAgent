@@ -8,15 +8,26 @@
 
 ## 💡 核心特性
 
-**仅用 400 行 Python 核心代码，复刻 Claude Code 的编程能力 + Manus 的系统操控能力！**
+**仅用 ~400 行 Python 核心函数，复刻 Claude Code 的编程能力 + Manus 的系统操控能力！**
 
 MiniAgent 是一个**极简、透明、强大的 CLI Agent 框架**，拒绝臃肿的依赖和复杂的架构：
 
 - 🧠 **Code Agent**: 像 Claude Code 一样写代码、修 Bug、跑测试
 - 🦾 **OS Agent**: 像 Manus 一样操控浏览器、编辑文档、管理应用
-- ⚡ **极简实现**: 核心逻辑 (`agent.py`) 仅 400 行，完全透明可控，适合学习和魔改
+- ⚡ **极简实现**: 核心逻辑 (`agent.py`) ~400 行核心函数，完全透明可控，适合学习和魔改
 - 🤖 **全模型支持**: 完美支持 DeepSeek、OpenAI、Claude 等所有兼容 OpenAI 接口的模型
 - 🔌 **高扩展性**: 极简的装饰器模式，3行代码即可挂载自定义工具
+- 🔄 **双模式工具调用**: 文本解析模式（透明可学习）+ 原生 Function Calling 模式（更可靠）
+
+## 设计哲学
+
+> **MiniAgent 不内置 100 个工具，而是用 6 个代码工具 + bash 实现无限可能。**
+
+- 要截图？LLM 会 `bash: python -c "from mss import mss; mss().shot()"`
+- 要控制鼠标？LLM 会 `bash: python -c "import pyautogui; pyautogui.click(100,200)"`
+- 要爬网页？LLM 会 `bash: curl ... | python -c "..."`
+
+这就是极简的力量：让 LLM 做它最擅长的事 — **思考和组合**。
 
 ## 快速开始
 
@@ -85,24 +96,49 @@ you: 运行一下
 | | `edit` | 编辑文件指定行 |
 | | `grep` | 搜索文件内容 |
 | | `glob` | 列出匹配的文件 |
-| | `bash` | 执行 Shell 命令 |
+| | `bash` | 执行 Shell 命令（支持超时控制） |
 | **OS** | `open_browser` | 打开网页或搜索 |
 | | `open_app` | 启动本地应用 (calc, notepad...) |
 | | `create_docx` | 创建 Word 文档 |
 | | `clipboard_copy`| 复制到剪贴板 |
-| **Misc** | `calculator` | 数学计算 |
+| | `clipboard_read`| 读取剪贴板内容 |
+| **System** | `system_info` | 系统信息 |
+| | `system_load` | CPU/内存/磁盘负载 |
+| | `process_list` | 进程列表 |
+| | `disk_usage` | 磁盘使用情况 |
+| **Misc** | `calculator` | 数学计算（AST 安全求值） |
+| | `get_current_time` | 当前时间 |
+| | `web_search` | 网页搜索 |
+| | `http_request` | HTTP 请求 |
 
 ## 项目结构
 
 ```
 miniagent/
-├── agent.py      # 核心 Agent (~400行)
+├── agent.py      # 核心 Agent（~400行核心函数）
 ├── cli.py        # 命令行界面
 ├── config.py     # 配置管理
+├── memory.py     # 会话记忆
 ├── tools/        # 工具集
-│   ├── code_tools.py   # 代码工具
-│   └── basic_tools.py  # 基础工具
+│   ├── code_tools.py   # 代码工具 (read/write/edit/grep/glob/bash)
+│   └── basic_tools.py  # 基础工具 (calculator/browser/clipboard/docx...)
 └── utils/        # 工具函数
+```
+
+## 双模式工具调用
+
+MiniAgent 支持两种工具调用模式，便于学习和对比：
+
+### 文本模式（默认）
+LLM 在响应中输出结构化文本，Agent 解析执行 — **完全透明，最佳教学模式**：
+```python
+agent.run("计算 2+2")  # 默认文本模式
+```
+
+### 原生 Function Calling 模式
+使用 OpenAI 兼容的 tools 参数 — **更可靠，支持并行工具调用**：
+```python
+agent.run("计算 2+2", mode="native")  # 原生 FC 模式
 ```
 
 ## 自定义工具
@@ -119,6 +155,17 @@ def my_tool(arg: str) -> str:
 agent = MiniAgent(...)
 agent.load_builtin_tool("my_tool")
 ```
+
+## 与同类项目对比
+
+| 特点 | MiniAgent | nanocode | LangChain |
+|------|-----------|---------|-----------|
+| 核心代码 | ~400行核心函数 | ~271行单文件 | 10万+行 |
+| 工具调用 | 文本解析 + 原生FC 双模式 | 仅原生FC | 多层抽象 |
+| 可读性 | ⭐⭐⭐⭐⭐ 初学者友好 | ⭐⭐⭐⭐ 紧凑 | ⭐⭐ 复杂 |
+| OS 控制 | bash 万能 + 专用工具 | 仅 bash | 需插件 |
+| 教学价值 | 最好的 Agent 教科书 | 过于紧凑 | 过于复杂 |
+| 模型支持 | 全模型兼容 | Claude 为主 | 全模型 |
 
 ## 致谢
 

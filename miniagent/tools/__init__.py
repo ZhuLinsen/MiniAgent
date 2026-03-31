@@ -239,7 +239,9 @@ def get_tools_description(tools: Optional[List[str]] = None) -> List[Dict[str, A
 try:
     from .basic_tools import (
         calculator, get_current_time, system_info, file_stats,
-        disk_usage, process_list, system_load, web_search, http_request
+        disk_usage, process_list, system_load, web_search, http_request,
+        open_browser, open_app, clipboard_copy, clipboard_read,
+        create_docx, env_get, env_set
     )
     logger.debug("Imported all tools from basic_tools")
 except ImportError as e:
@@ -266,8 +268,10 @@ def load_tools(tools: Union[List[str], str, None] = None) -> List[str]:
         # Load all available tools
         tools = [
             "calculator", "get_current_time", "system_info", "file_stats",
-            "disk_usage", "process_list", "system_load", "web_search", "http_request"
-            , "read", "write", "edit", "glob", "grep", "bash"
+            "disk_usage", "process_list", "system_load", "web_search", "http_request",
+            "open_browser", "open_app", "clipboard_copy", "clipboard_read",
+            "create_docx", "env_get", "env_set",
+            "read", "write", "edit", "glob", "grep", "bash"
         ]
     
     if isinstance(tools, str):
