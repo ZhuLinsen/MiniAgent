@@ -138,10 +138,13 @@ you: Run it
 | | `system_load` | CPU/memory/disk load |
 | | `process_list` | Process listing |
 | | `disk_usage` | Disk usage stats |
+| | `env_get` | Read environment variable |
+| | `env_set` | Set environment variable |
 | **Misc** | `calculator` | Math (AST-safe evaluation) |
 | | `get_current_time` | Current time |
 | | `web_search` | Web search |
 | | `http_request` | HTTP requests |
+| | `file_stats` | File/directory statistics |
 
 ## Project Structure
 

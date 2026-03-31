@@ -57,7 +57,7 @@ def clean_json_string(json_str: str) -> str:
     
     return json_str.strip()
 
-def parse_json(json_str: str) -> Dict:
+def parse_json(json_str: str) -> Union[Dict, List]:
     """
     Parse JSON string, handling various error cases
     
@@ -65,7 +65,7 @@ def parse_json(json_str: str) -> Dict:
         json_str: JSON string
         
     Returns:
-        Parsed dictionary
+        Parsed dictionary or list
     """
     if not json_str:
         logger.debug("Received empty JSON string")
@@ -106,7 +106,7 @@ def parse_json(json_str: str) -> Dict:
                     try:
                         fixed = _fix_unescaped_newlines(extracted_json)
                         return json.loads(fixed)
-                    except:
+                    except (json.JSONDecodeError, ValueError):
                         pass
         
         # 2. Try to fix quote issues
@@ -122,7 +122,7 @@ def parse_json(json_str: str) -> Dict:
         try:
             return json.loads(fixed_json)
         except json.JSONDecodeError:
-            logger.debug(f"Unable to parse JSON: {truncate_message_content(json_str)}")
+            logger.debug(f"All JSON parse attempts failed for input: {truncate_message_content(json_str)}")
             return {}
 
 

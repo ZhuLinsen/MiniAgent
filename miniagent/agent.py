@@ -33,6 +33,9 @@ _DANGEROUS_PATTERNS = [
     r"\bshutdown\b|\breboot\b",     # system control
     r"\bkill\s+-9\b",              # force kill
     r"\bpkill\b|\bkillall\b",      # mass kill
+    r"\bcurl\b.*\|\s*\bsh\b",      # pipe curl to shell
+    r"\bwget\b.*\|\s*\bsh\b",      # pipe wget to shell
+    r"[;&|]\s*\brm\s",             # chained rm after other commands
 ]
 
 _DANGEROUS_RE = re.compile("|".join(_DANGEROUS_PATTERNS), re.IGNORECASE)
@@ -225,9 +228,6 @@ If the question is outside the scope of the available tools, use your knowledge 
         self.system_prompt = skill.prompt
         if skill.temperature is not None:
             self.temperature = skill.temperature
-        if skill.max_iterations is not None:
-            self._default_max_iterations = skill.max_iterations
-        
         # Filter tools to skill whitelist
         if skill.tools is not None:
             self.tools = [t for t in self.tools if t["name"] in skill.tools]

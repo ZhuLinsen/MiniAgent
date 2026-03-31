@@ -149,7 +149,7 @@ def glob(pattern: str, path: str = ".") -> List[str]:  # noqa: A002
         return [str(p.resolve()) for p in matches]
     except Exception as e:
         logger.exception("glob failed")
-        return [f"error: {e}"]
+        return [f"error: glob failed: {e}"]
 
 
 @register_tool

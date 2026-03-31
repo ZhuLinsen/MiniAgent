@@ -127,6 +127,14 @@ def my_tool(arg: str) -> str:
 3. **测试覆盖** — 核心逻辑改动需附带测试
 4. **中英文** — README 维护中英文两个版本
 
+## 测试
+
+```bash
+python -m pytest tests/ -v
+```
+
+当前测试覆盖：100+ 测试用例，涵盖工具注册、JSON 解析、技能系统、会话记忆、Agent 初始化等。
+
 ## Git 工作流
 
 - **禁止直接 push 到 main 分支**，所有改动需通过 Pull Request 提交
@@ -140,12 +148,24 @@ def my_tool(arg: str) -> str:
 
 | 环境变量 | 默认值 | 说明 |
 |----------|--------|------|
+| `LLM_API_KEY` | — | LLM API 密钥（必需） |
+| `LLM_MODEL` | — | 模型名称（必需） |
+| `LLM_API_BASE` | — | API 基础 URL |
+| `LLM_TEMPERATURE` | 0.7 | LLM 采样温度 |
+| `LLM_ORGANIZATION` | — | OpenAI organization ID |
 | `BASH_TIMEOUT` | 120 | bash 工具默认超时时间（秒） |
 | `BASH_MAX_OUTPUT` | 50000 | bash 输出最大字符数 |
 | `TOOL_RESULT_LIMIT` | 16000 | 工具结果回传给 LLM 的最大字符数 |
 | `MAX_CONTEXT_MESSAGES` | 20 | 超过此数量自动压缩对话历史 |
 | `CONFIRM_DANGEROUS` | true | 是否拦截危险 bash 命令 |
 | `MINIAGENT_STREAM` | 1 | 是否启用流式输出（0=关闭） |
+| `ENABLE_REFLECTION` | false | 是否启用反思机制 |
+| `REFLECTION_MAX_ITERATIONS` | 3 | 反思最大迭代次数 |
+| `SERPAPI_KEY` | — | SerpAPI 密钥（web_search 工具需要） |
+| `LOG_LEVEL` | INFO | 日志级别 |
+| `MINIAGENT_HOME` | ~/.miniagent | 会话记忆存储路径 |
+
+**多供应商别名**: 如果未设置 `LLM_API_KEY`，框架会依次尝试读取 `OPENAI_API_KEY`、`DEEPSEEK_API_KEY`、`ANTHROPIC_API_KEY`、`AZURE_OPENAI_API_KEY` 作为 fallback。详见 `config.py`。
 
 超出限制时使用**头+尾智能截断**（保留 70% 开头 + 30% 结尾），确保错误信息不会因截断丢失。
 

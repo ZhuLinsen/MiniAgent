@@ -14,8 +14,8 @@
 1. 克隆仓库：
 
 ```bash
-git clone https://github.com/yourusername/miniagent.git
-cd miniagent
+git clone https://github.com/ZhuLinsen/MiniAgent.git
+cd MiniAgent
 ```
 
 2. 创建并激活虚拟环境（推荐）：
@@ -73,9 +73,8 @@ pip install -e .
 ### 分支管理
 
 - `main`: 主分支，保持稳定可用
-- `develop`: 开发分支，最新更改
-- 功能分支：从`develop`分支创建，命名为`feature/<功能名称>`
-- 修复分支：从`main`分支创建，命名为`fix/<bug描述>`
+- 功能分支：从 `main` 分支创建，命名为 `feature/<功能名称>`
+- 修复分支：从 `main` 分支创建，命名为 `fix/<bug描述>`
 
 ## 提交Pull Request
 
@@ -83,7 +82,7 @@ pip install -e .
 2. 从您的fork创建新分支
 3. 进行更改并提交
 4. 推送到您的fork
-5. 从您的分支向原仓库的`develop`分支提交Pull Request
+5. 从您的分支向原仓库的 `main` 分支提交Pull Request
 6. 在PR中详细描述您的更改
 
 ## 开发环境变量
@@ -91,16 +90,17 @@ pip install -e .
 将`.env.example`复制为`.env`并填写您的API密钥：
 
 ```
-OPENAI_API_KEY=your_api_key_here
+LLM_API_KEY=your_api_key_here
 ```
 
 ## 测试
 
-运行测试前，请确保您已设置API密钥或使用测试模式：
+运行测试：
 
 ```bash
-# 将在未来版本中添加
-# python -m pytest tests/
+python -m pytest tests/ -v
 ```
+
+核心逻辑改动需附带测试用例。
 
 感谢您的贡献！ 

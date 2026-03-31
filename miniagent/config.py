@@ -154,42 +154,4 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
     except Exception as e:
         logger.error(f"Failed to load configuration from {config_path}: {e}")
         
-    return config
-
-
-def save_config(config: AgentConfig, config_path: str) -> bool:
-    """
-    Save configuration to file
-    
-    Args:
-        config: Agent configuration object
-        config_path: Configuration file path
-        
-    Returns:
-        Whether save was successful
-    """
-    try:
-        # Convert dataclass to dictionary
-        config_dict = {
-            "llm": {
-                key: value for key, value in config.llm.__dict__.items()
-                if not key.startswith("_") and value is not None
-            },
-            "system_prompt": config.system_prompt,
-            "default_tools": config.default_tools,
-            "enable_reflection": config.enable_reflection,
-            "reflection_system_prompt": config.reflection_system_prompt,
-            "reflection_max_iterations": config.reflection_max_iterations
-        }
-        
-        config_file = Path(config_path)
-        config_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(config_file, "w", encoding="utf-8") as f:
-            json.dump(config_dict, f, indent=2, ensure_ascii=False)
-            
-        logger.info(f"Configuration saved to: {config_path}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to save configuration to '{config_path}': {str(e)}")
-        return False 
+    return config 

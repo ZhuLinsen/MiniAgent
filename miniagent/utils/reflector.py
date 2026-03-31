@@ -44,7 +44,7 @@ class Reflector:
             messages: Conversation messages
             
         Returns:
-            Potentially modified messages
+            Potentially modified copy of messages (original is not mutated)
         """
         if self.disabled or not self.client or not self.model:
             return messages
@@ -71,8 +71,9 @@ class Reflector:
         # Reflect on the response
         improved_response = self.reflect(last_user_msg, last_assistant_msg)
         
-        # If reflection improved the response, update the last assistant message
+        # If reflection improved the response, update in a copy
         if improved_response and improved_response != last_assistant_msg:
+            messages = [dict(m) for m in messages]
             for i in range(len(messages)-1, 0, -1):
                 if messages[i]["role"] == "assistant":
                     messages[i]["content"] = improved_response

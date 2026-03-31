@@ -312,8 +312,8 @@ def http_request(
         if method.upper() in ["POST", "PUT", "PATCH"] and data:
             kwargs["json"] = data
             
-        # Send request
-        response = requests.request(method.upper(), url, **kwargs)
+        # Send request with certificate verification
+        response = requests.request(method.upper(), url, timeout=30, verify=True, **kwargs)
         
         # Prepare response data
         try:
@@ -416,7 +416,7 @@ def system_load() -> Dict[str, Any]:
             "cpu": {
                 "percent": cpu_percent,
                 "count": cpu_count,
-                "load_avg": psutil.getloadavg()
+                "load_avg": psutil.getloadavg() if hasattr(psutil, "getloadavg") else None
             },
             "memory": {
                 "total": memory.total,

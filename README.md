@@ -140,10 +140,13 @@ you: 运行一下
 | | `system_load` | CPU/内存/磁盘负载 |
 | | `process_list` | 进程列表 |
 | | `disk_usage` | 磁盘使用情况 |
+| | `env_get` | 读取环境变量 |
+| | `env_set` | 设置环境变量 |
 | **Misc** | `calculator` | 数学计算（AST 安全求值） |
 | | `get_current_time` | 当前时间 |
 | | `web_search` | 网页搜索 |
 | | `http_request` | HTTP 请求 |
+| | `file_stats` | 文件/目录统计 |
 
 ## 项目结构
 
