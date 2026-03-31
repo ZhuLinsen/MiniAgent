@@ -106,3 +106,24 @@ def my_tool(arg: str) -> str:
 2. **不破坏现有功能** — 所有改动需确保向后兼容
 3. **测试覆盖** — 核心逻辑改动需附带测试
 4. **中英文** — README 维护中英文两个版本
+
+## Git 工作流
+
+- **禁止直接 push 到 main 分支**，所有改动需通过 Pull Request 提交
+- PR 需要至少一位 maintainer 审核同意后才能合并
+- 提交信息使用 [Conventional Commits](https://www.conventionalcommits.org/) 格式（`feat:`, `fix:`, `refactor:`, `docs:` 等）
+- 涉及核心逻辑（agent.py, tools/）的改动需附带测试
+
+## 可配置参数
+
+以下限制参数可通过环境变量或 `.env` 文件覆盖：
+
+| 环境变量 | 默认值 | 说明 |
+|----------|--------|------|
+| `BASH_TIMEOUT` | 120 | bash 工具默认超时时间（秒） |
+| `BASH_MAX_OUTPUT` | 50000 | bash 输出最大字符数 |
+| `TOOL_RESULT_LIMIT` | 16000 | 工具结果回传给 LLM 的最大字符数 |
+
+超出限制时使用**头+尾智能截断**（保留 70% 开头 + 30% 结尾），确保错误信息不会因截断丢失。
+
+bash 工具的 `timeout` 参数也可在每次调用时由 LLM 自行指定，例如对安装类命令传入 `timeout=300`。

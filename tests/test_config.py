@@ -30,3 +30,20 @@ class TestLoadConfig:
         config = load_config()
         assert config.llm.temperature >= 0
         assert config.llm.model is not None
+
+    def test_configurable_limits_defaults(self, monkeypatch):
+        monkeypatch.setenv("LLM_API_KEY", "k")
+        config = load_config()
+        assert config.bash_timeout == 120
+        assert config.bash_max_output == 50000
+        assert config.tool_result_limit == 16000
+
+    def test_configurable_limits_from_env(self, monkeypatch):
+        monkeypatch.setenv("LLM_API_KEY", "k")
+        monkeypatch.setenv("BASH_TIMEOUT", "300")
+        monkeypatch.setenv("BASH_MAX_OUTPUT", "100000")
+        monkeypatch.setenv("TOOL_RESULT_LIMIT", "32000")
+        config = load_config()
+        assert config.bash_timeout == 300
+        assert config.bash_max_output == 100000
+        assert config.tool_result_limit == 32000

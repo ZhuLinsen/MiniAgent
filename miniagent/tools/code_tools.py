@@ -187,17 +187,17 @@ def grep(pattern: str, path: str = ".") -> List[Dict[str, Any]]:  # noqa: A002
 
 
 @register_tool
-def bash(cmd: str, timeout: int = 30) -> Dict[str, Any]:
+def bash(cmd: str, timeout: int = 120) -> Dict[str, Any]:
     """Execute a shell command.
 
     Args:
         cmd: Shell command string.
-        timeout: Maximum execution time in seconds (default 30).
+        timeout: Maximum execution time in seconds (default 120).
 
     Returns:
         Dict containing exit_code, stdout, stderr.
     """
-    MAX_OUTPUT = 10000
+    MAX_OUTPUT = int(os.environ.get("BASH_MAX_OUTPUT", "50000"))
     try:
         completed = subprocess.run(
             cmd,
@@ -208,19 +208,29 @@ def bash(cmd: str, timeout: int = 30) -> Dict[str, Any]:
             env=os.environ.copy(),
             timeout=timeout,
         )
-        stdout = (completed.stdout or "").strip()
-        stderr = (completed.stderr or "").strip()
-        if len(stdout) > MAX_OUTPUT:
-            stdout = stdout[:MAX_OUTPUT] + f"\n... [truncated, {len(stdout)} chars total]"
-        if len(stderr) > MAX_OUTPUT:
-            stderr = stderr[:MAX_OUTPUT] + f"\n... [truncated, {len(stderr)} chars total]"
+        stdout = _smart_truncate(completed.stdout or "", MAX_OUTPUT)
+        stderr = _smart_truncate(completed.stderr or "", MAX_OUTPUT)
         return {
             "exit_code": completed.returncode,
-            "stdout": stdout,
-            "stderr": stderr,
+            "stdout": stdout.strip(),
+            "stderr": stderr.strip(),
         }
     except subprocess.TimeoutExpired:
         return {"exit_code": 1, "stdout": "", "stderr": f"Command timed out after {timeout}s"}
     except Exception as e:
         logger.exception("bash failed")
         return {"exit_code": 1, "stdout": "", "stderr": str(e)}
+
+
+def _smart_truncate(text: str, limit: int) -> str:
+    """Truncate text keeping both head and tail (so error info at end is preserved)."""
+    if len(text) <= limit:
+        return text
+    # Keep 70% head, 30% tail
+    head_size = int(limit * 0.7)
+    tail_size = limit - head_size - 80  # 80 chars for separator
+    return (
+        text[:head_size]
+        + f"\n\n... [truncated {len(text) - head_size - tail_size} chars, {len(text)} total] ...\n\n"
+        + text[-tail_size:]
+    )

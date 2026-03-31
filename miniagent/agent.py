@@ -174,7 +174,7 @@ class MiniAgent:
         # Two clean patterns: strict and relaxed
         tool_name_patterns = [
             r"TOOL:\s*(\w+)\s*ARGS:\s*",
-            r"(?:Tool|工具|USE TOOL|使用工具|工具名称|TOL):\s*(\w+)\s*(?:Args|参数|WITH ARGS|工具参数|Arguments):\s*",
+            r"(?:Tool|工具|USE TOOL|使用工具|工具名称|TOL):\s*(\w+)\s*(?:ARGS|Args|参数|WITH ARGS|工具参数|Arguments):\s*",
         ]
 
         for pattern in tool_name_patterns:
@@ -409,8 +409,15 @@ class MiniAgent:
             
             # Truncate long tool results to prevent token overflow
             result_str = str(result)
-            if len(result_str) > 4000:
-                result_str = result_str[:4000] + f"\n... [truncated, {len(result_str)} chars total]"
+            limit = int(os.environ.get("TOOL_RESULT_LIMIT", "16000"))
+            if len(result_str) > limit:
+                head = int(limit * 0.7)
+                tail = limit - head - 80
+                result_str = (
+                    result_str[:head]
+                    + f"\n\n... [truncated {len(result_str) - head - tail} chars, {len(result_str)} total] ...\n\n"
+                    + result_str[-tail:]
+                )
             
             # Add tool result to messages
             messages.append({
@@ -508,8 +515,15 @@ class MiniAgent:
                 
                 # Truncate long results
                 result_str = str(result)
-                if len(result_str) > 4000:
-                    result_str = result_str[:4000] + f"\n... [truncated, {len(result_str)} chars total]"
+                limit = int(os.environ.get("TOOL_RESULT_LIMIT", "16000"))
+                if len(result_str) > limit:
+                    head = int(limit * 0.7)
+                    tail = limit - head - 80
+                    result_str = (
+                        result_str[:head]
+                        + f"\n\n... [truncated {len(result_str) - head - tail} chars, {len(result_str)} total] ...\n\n"
+                        + result_str[-tail:]
+                    )
                 
                 messages.append({
                     "role": "tool",

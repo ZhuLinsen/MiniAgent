@@ -45,6 +45,11 @@ class AgentConfig:
     enable_reflection: bool = False
     reflection_system_prompt: Optional[str] = None
     reflection_max_iterations: int = 3
+    
+    # Tool execution limits (configurable via env vars)
+    bash_timeout: int = 120          # BASH_TIMEOUT: bash default timeout in seconds
+    bash_max_output: int = 50000     # BASH_MAX_OUTPUT: bash output truncation limit
+    tool_result_limit: int = 16000   # TOOL_RESULT_LIMIT: tool result truncation limit
 
 def load_config(config_path: Optional[str] = None) -> AgentConfig:
     """
@@ -94,6 +99,14 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
     env_model = os.environ.get("LLM_MODEL")
     if env_model:
         config.llm.model = env_model
+    
+    # Load tool execution limits from environment
+    if os.environ.get("BASH_TIMEOUT"):
+        config.bash_timeout = int(os.environ["BASH_TIMEOUT"])
+    if os.environ.get("BASH_MAX_OUTPUT"):
+        config.bash_max_output = int(os.environ["BASH_MAX_OUTPUT"])
+    if os.environ.get("TOOL_RESULT_LIMIT"):
+        config.tool_result_limit = int(os.environ["TOOL_RESULT_LIMIT"])
         
     # Determine likely provider based on API_BASE and set appropriate default model
     if config.llm.api_base:
