@@ -19,6 +19,20 @@ _CLI_MODE = False
 # List of loggers to fix duplicate handlers for third-party libraries
 _THIRD_PARTY_LOGGERS = ["httpx", "httpcore", "urllib3"]
 
+# Shared level name → int mapping
+_LEVEL_MAP = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
+
+
+def _parse_level(default: str = "INFO") -> int:
+    """Resolve LOG_LEVEL env var to a logging int."""
+    return _LEVEL_MAP.get(os.environ.get("LOG_LEVEL", default).upper(), logging.INFO)
+
 def get_logger(
     name: str, 
     level: Optional[int] = None, 
@@ -54,15 +68,7 @@ def get_logger(
     
     # Set log level from environment variable or default to INFO
     if level is None:
-        env_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-        level_map = {
-            "DEBUG": logging.DEBUG,
-            "INFO": logging.INFO,
-            "WARNING": logging.WARNING,
-            "ERROR": logging.ERROR,
-            "CRITICAL": logging.CRITICAL
-        }
-        level = level_map.get(env_level, logging.INFO)
+        level = _parse_level()
         
     logger.setLevel(level)
     
@@ -108,19 +114,8 @@ def _configure_root_logger(level: Optional[int] = None, format_str: Optional[str
     # Set log level from environment variable or default to INFO
     # In CLI mode, default to WARNING to keep output clean
     if level is None:
-        if _CLI_MODE:
-            default_level = "WARNING"
-        else:
-            default_level = "INFO"
-        env_level = os.environ.get("LOG_LEVEL", default_level).upper()
-        level_map = {
-            "DEBUG": logging.DEBUG,
-            "INFO": logging.INFO,
-            "WARNING": logging.WARNING,
-            "ERROR": logging.ERROR,
-            "CRITICAL": logging.CRITICAL
-        }
-        level = level_map.get(env_level, logging.INFO)
+        default_level = "WARNING" if _CLI_MODE else "INFO"
+        level = _parse_level(default_level)
     
     root_logger.setLevel(level)
     
@@ -148,17 +143,7 @@ def _fix_third_party_loggers():
         
         # If the logger doesn't have any handlers, add one to ensure messages are still logged
         if not logger.handlers:
-            # Get level from environment or use INFO as default
-            env_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-            level_map = {
-                "DEBUG": logging.DEBUG,
-                "INFO": logging.INFO,
-                "WARNING": logging.WARNING,
-                "ERROR": logging.ERROR,
-                "CRITICAL": logging.CRITICAL
-            }
-            level = level_map.get(env_level, logging.INFO)
-            
+            level = _parse_level()
             handler = logging.StreamHandler()
             formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
             handler.setFormatter(formatter)

@@ -3,7 +3,6 @@
 import os
 import json
 import re
-import time
 from typing import Any, Callable, Dict, Generator, List, Optional
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
@@ -392,6 +391,12 @@ If the question is outside the scope of the available tools, use your knowledge 
             return f"Error executing tool: {str(e)}"
     
     @retry(stop=stop_after_attempt(3), wait=wait_random_exponential(min=1, max=60))
+    def _maybe_reflect(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """Apply reflection if enabled and conversation has history."""
+        if self.use_reflector and len(messages) > 1 and self.reflector:
+            return self.reflector.apply_reflection(messages)
+        return messages
+
     def _call_llm(self, messages: List[Dict[str, str]]) -> str:
         """
         Call LLM with messages
@@ -411,8 +416,7 @@ If the question is outside the scope of the available tools, use your knowledge 
                 raise ValueError("API key is not set. Please check your environment variables.")
             
             # Apply reflection if enabled
-            if self.use_reflector and len(messages) > 1 and self.reflector:
-                messages = self.reflector.apply_reflection(messages)
+            messages = self._maybe_reflect(messages)
                 
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -437,8 +441,7 @@ If the question is outside the scope of the available tools, use your knowledge 
         if not self.api_key:
             raise ValueError("API key is not set.")
         
-        if self.use_reflector and len(messages) > 1 and self.reflector:
-            messages = self.reflector.apply_reflection(messages)
+        messages = self._maybe_reflect(messages)
         
         try:
             response = self.client.chat.completions.create(
@@ -532,10 +535,6 @@ If the question is outside the scope of the available tools, use your knowledge 
     # Shared helpers for both run modes
     # ------------------------------------------------------------------
 
-    def _get_config_limits(self):
-        """Return cached configurable limits."""
-        return self._max_context_messages, self._tool_result_limit
-
     def _compress_if_needed(self, messages, max_context_messages):
         """Compress conversation history when it exceeds the limit."""
         if len(messages) > max_context_messages:
@@ -583,7 +582,6 @@ If the question is outside the scope of the available tools, use your knowledge 
         Returns:
             Final response text
         """
-        start_time = time.time()
         logger.info(f"Starting query processing with tools: {query}")
         
         system_prompt = self._TEXT_MODE_PROMPT.format(
@@ -596,7 +594,7 @@ If the question is outside the scope of the available tools, use your knowledge 
             {"role": "user", "content": query}
         ]
         
-        max_ctx, limit = self._get_config_limits()
+        max_ctx, limit = self._max_context_messages, self._tool_result_limit
         
         iteration = 0
         while iteration < max_iterations:
@@ -680,7 +678,7 @@ If the question is outside the scope of the available tools, use your knowledge 
             {"role": "user", "content": query}
         ]
         
-        max_ctx, limit = self._get_config_limits()
+        max_ctx, limit = self._max_context_messages, self._tool_result_limit
         
         iteration = 0
         while iteration < max_iterations:

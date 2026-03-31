@@ -3,11 +3,10 @@
 import json
 import re
 from typing import Dict, Any, Optional, Union, List, Tuple
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from ..logger import get_logger
+
+logger = get_logger(__name__)
 
 def extract_json_from_markdown(text: str) -> Tuple[Optional[str], str]:
     """

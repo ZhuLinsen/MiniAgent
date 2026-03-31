@@ -152,20 +152,22 @@ you: 运行一下
 
 ```
 miniagent/
-├── agent.py        # 核心 Agent 引擎（LLM 交互 + 工具调用循环）
-├── cli.py          # 交互式命令行界面（Rich 格式化 + 流式输出）
-├── config.py       # 配置管理（.env + JSON + 环境变量）
-├── skills.py       # Skill 系统（可复用的 Agent 配置）
-├── memory.py       # 轻量会话记忆
-├── extensions/     # 可选扩展
-│   ├── mcp_client.py   # MCP 协议客户端
-│   └── orchestrator.py # Agent 编排器
-├── tools/          # 工具集
+├── agent.py        # 🧠 核心 Agent 引擎（从这里开始读！）
+│                   #    LLM 循环 + 工具调用 + 上下文管理
+├── cli.py          # 💬 交互式命令行界面（Rich + 流式输出）
+├── tools/          # 🔧 工具集
 │   ├── code_tools.py   # 代码工具 (read/write/edit/grep/glob/bash)
 │   └── basic_tools.py  # 基础工具 (calculator/browser/clipboard/docx...)
+├── extensions/     # 🔌 可选扩展
+│   ├── mcp_client.py   # MCP 协议客户端
+│   └── orchestrator.py # 多 Agent 编排器
+├── skills.py       # 🎯 Skill 系统（可复用的 Agent 角色配置）
+├── config.py       # ⚙️ 配置管理（.env + JSON + 环境变量）
+├── memory.py       # 💾 轻量会话记忆
 └── utils/          # 工具函数
-    ├── json_utils.py   # JSON 解析
-    └── text_utils.py   # 文本处理
+    ├── json_utils.py   # 健壮 JSON 解析
+    ├── text_utils.py   # 文本处理
+    └── reflector.py    # 反思机制（可选）
 ```
 
 ## 双模式工具调用

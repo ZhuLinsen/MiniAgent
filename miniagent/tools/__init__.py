@@ -6,11 +6,11 @@ This module provides a set of tools that can be used by the agent to interact wi
 
 import importlib
 import inspect
-import logging
 from typing import Any, Callable, Dict, List, Optional, Union
 
-# Configure logging
-logger = logging.getLogger(__name__)
+from ..logger import get_logger
+
+logger = get_logger(__name__)
 
 # Tool function type
 ToolFunction = Callable[..., Any]

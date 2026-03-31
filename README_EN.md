@@ -150,20 +150,22 @@ you: Run it
 
 ```
 miniagent/
-├── agent.py        # Core Agent engine (LLM interaction + tool calling loop)
-├── cli.py          # Interactive CLI (Rich formatting + streaming)
-├── config.py       # Configuration (env + JSON + environment variables)
-├── skills.py       # Skill system (reusable Agent configs)
-├── memory.py       # Lightweight session memory
-├── extensions/     # Optional extensions
-│   ├── mcp_client.py   # MCP protocol client
-│   └── orchestrator.py # Agent orchestrator
-├── tools/          # Tool sets
+├── agent.py        # 🧠 Core Agent engine (start reading here!)
+│                   #    LLM loop + tool calling + context management
+├── cli.py          # 💬 Interactive CLI (Rich + streaming output)
+├── tools/          # 🔧 Tool sets
 │   ├── code_tools.py   # Code tools (read/write/edit/grep/glob/bash)
 │   └── basic_tools.py  # Basic tools (calculator/browser/clipboard/docx...)
+├── extensions/     # 🔌 Optional extensions
+│   ├── mcp_client.py   # MCP protocol client
+│   └── orchestrator.py # Multi-agent orchestrator
+├── skills.py       # 🎯 Skill system (reusable Agent role configs)
+├── config.py       # ⚙️ Configuration (.env + JSON + environment variables)
+├── memory.py       # 💾 Lightweight session memory
 └── utils/          # Utility functions
-    ├── json_utils.py   # JSON parsing
-    └── text_utils.py   # Text processing
+    ├── json_utils.py   # Robust JSON parsing
+    ├── text_utils.py   # Text processing
+    └── reflector.py    # Reflection mechanism (optional)
 ```
 
 ## Dual Tool Calling Modes

@@ -30,13 +30,18 @@ setup(
     project_urls={
         "Bug Tracker": "https://github.com/ZhuLinsen/MiniAgent/issues",
         "Source": "https://github.com/ZhuLinsen/MiniAgent",
+        "Documentation": "https://github.com/ZhuLinsen/MiniAgent#readme",
     },
-    keywords=["agent", "ai", "llm", "cli", "tool-calling", "miniagent", "deepseek", "openai"],
+    keywords=[
+        "agent", "ai", "llm", "cli", "tool-calling", "miniagent",
+        "deepseek", "openai", "code-generation", "automation", "agentic",
+    ],
     license="Apache-2.0",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "Intended Audience :: Education",
+        "Intended Audience :: Science/Research",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",
@@ -45,6 +50,7 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     python_requires=">=3.8",
     entry_points={

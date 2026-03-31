@@ -2,11 +2,11 @@
 Implementation of Reflector for agent response reflection and improvement
 """
 
-import logging
 from typing import Dict, Any, Optional, List
 
-# Configure logging
-logger = logging.getLogger(__name__)
+from ..logger import get_logger
+
+logger = get_logger(__name__)
 
 class Reflector:
     """

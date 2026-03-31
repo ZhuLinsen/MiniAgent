@@ -160,12 +160,15 @@ def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
     temperature = args.temperature if args.temperature is not None else cfg.llm.temperature
 
     if not api_key:
-        console.print("[red]error:[/red] Missing API key.")
-        console.print("[yellow]Tip:[/yellow] Create a .env file with:")
-        console.print("  LLM_API_KEY=your_key_here")
-        console.print("  LLM_MODEL=deepseek-chat")
-        console.print("  LLM_API_BASE=https://api.deepseek.com/v1")
-        console.print("[dim]Or pass --api-key on the command line.[/dim]")
+        console.print("[bold red]❌ Missing API Key[/bold red]")
+        console.print("\n[bold]Quick setup:[/bold]")
+        console.print("  1. Copy the example: [cyan]cp .env.example .env[/cyan]")
+        console.print("  2. Edit with your key: [cyan]nano .env[/cyan]")
+        console.print("\n[bold]Required variables:[/bold]")
+        console.print("  [dim]LLM_API_KEY[/dim]   = your API key")
+        console.print("  [dim]LLM_MODEL[/dim]    = model name  (e.g. deepseek-chat, gpt-4o)")
+        console.print("  [dim]LLM_API_BASE[/dim] = endpoint URL (e.g. https://api.deepseek.com/v1)")
+        console.print("\n[dim]Or pass on command line: miniagent --api-key sk-xxx --model gpt-4o[/dim]")
         raise SystemExit(1)
 
     memory = Memory()
@@ -227,11 +230,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         console.print(f"[red]error:[/red] {e}")
         return 1
 
-    console.print(f"[dim]cwd:[/dim] {os.getcwd()}")
-    console.print(f"[dim]commands:[/dim] /help /tools /stream /c /q")
+    console.print(f"[dim]model:[/dim] {agent.model}  [dim]tools:[/dim] {len(agent.tools)}  [dim]type /help for commands[/dim]")
     
     # Streaming flag — can be toggled with /stream
     use_streaming = os.environ.get("MINIAGENT_STREAM", "1") != "0"
+    # Tool calling mode — "text" (default) or "native"
+    run_mode = "text"
 
     history: List[Dict[str, str]] = []
 
@@ -256,18 +260,36 @@ def main(argv: Optional[List[str]] = None) -> int:
             use_streaming = not use_streaming
             console.print(f"[dim]streaming {'on' if use_streaming else 'off'}[/dim]")
             continue
+        if user_text == "/model":
+            console.print(f"[dim]current model:[/dim] {agent.model}")
+            try:
+                new_model = Prompt.ask("[dim]new model (enter to keep)[/dim]", default=agent.model)
+                if new_model != agent.model:
+                    agent.model = new_model
+                    console.print(f"[green]✓[/green] switched to {new_model}")
+            except (EOFError, KeyboardInterrupt):
+                pass
+            continue
+        if user_text == "/mode":
+            run_mode = "native" if run_mode == "text" else "text"
+            console.print(f"[dim]mode: {run_mode}[/dim]")
+            continue
         if user_text in ("/help", "help"):
             console.print("[bold]Commands:[/bold]")
             console.print("  /help    show this help")
             console.print("  /c       clear conversation history")
             console.print("  /stream  toggle streaming output")
+            console.print("  /model   switch LLM model")
+            console.print("  /mode    toggle text/native FC mode")
             console.print("  /tools   list loaded tools")
             console.print("  /q       quit")
-            console.print(f"\n[dim]streaming: {'on' if use_streaming else 'off'} | tools: {len(agent.tools)}[/dim]")
+            console.print(f"\n[dim]model: {agent.model} | mode: {run_mode} | streaming: {'on' if use_streaming else 'off'} | tools: {len(agent.tools)}[/dim]")
             continue
         if user_text == "/tools":
+            console.print(f"[bold]Loaded Tools ({len(agent.tools)}):[/bold]")
             for t in agent.tools:
-                console.print(f"  [cyan]{t['name']}[/cyan] — [dim]{t['description'][:60]}[/dim]")
+                desc = t['description'].split('\n')[0][:70]
+                console.print(f"  [cyan]{t['name']:<18}[/cyan] {desc}")
             continue
 
         history.append({"role": "user", "content": user_text})
@@ -297,19 +319,26 @@ def main(argv: Optional[List[str]] = None) -> int:
                 global _current_status
                 _current_status = status
                 try:
-                    response = agent.run_with_tools(
-                        query, 
-                        tool_callback=_tool_callback,
-                        status_callback=_status_callback,
-                        stream_callback=_stream_callback if use_streaming else None,
-                    )
+                    if run_mode == "native":
+                        response = agent.run_with_native_tools(
+                            query,
+                            tool_callback=_tool_callback,
+                            status_callback=_status_callback,
+                        )
+                    else:
+                        response = agent.run_with_tools(
+                            query, 
+                            tool_callback=_tool_callback,
+                            status_callback=_status_callback,
+                            stream_callback=_stream_callback if use_streaming else None,
+                        )
                 finally:
                     _current_status = None
         except TypeError:
             # Backward compatibility if tool_callback not available.
-            response = agent.run(query)
+            response = agent.run(query, mode=run_mode)
         except Exception as e:
-            console.print(f"[red]error:[/red] {e}")
+            console.print(f"[red]error:[/red] {type(e).__name__}: {str(e)[:200]}")
             continue
 
         history.append({"role": "assistant", "content": response})
