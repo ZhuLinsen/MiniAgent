@@ -6,12 +6,8 @@ This module provides a set of tools that can be used by the agent to interact wi
 
 import importlib
 import inspect
-import json
 import logging
-import os
-import sys
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -86,7 +82,7 @@ def execute_tool(name: str, **kwargs) -> Any:
     Returns:
         Result of the tool execution
     """
-    print(f"Executing tool: {name} with arguments: {kwargs}")
+    logger.info(f"Executing tool: {name} with arguments: {kwargs}")
     
     tool = get_tool(name)
     if not tool:

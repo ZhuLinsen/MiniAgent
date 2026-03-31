@@ -113,6 +113,10 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
         config.max_context_messages = int(os.environ["MAX_CONTEXT_MESSAGES"])
     if os.environ.get("CONFIRM_DANGEROUS") is not None:
         config.confirm_dangerous = os.environ["CONFIRM_DANGEROUS"].lower() not in ("0", "false", "no")
+    if os.environ.get("ENABLE_REFLECTION") is not None:
+        config.enable_reflection = os.environ["ENABLE_REFLECTION"].lower() not in ("0", "false", "no")
+    if os.environ.get("REFLECTION_MAX_ITERATIONS"):
+        config.reflection_max_iterations = int(os.environ["REFLECTION_MAX_ITERATIONS"])
         
     # Determine likely provider based on API_BASE and set appropriate default model
     if config.llm.api_base:

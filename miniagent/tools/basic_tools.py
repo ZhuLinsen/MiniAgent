@@ -232,7 +232,7 @@ def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
         # Get API key from environment
         api_key = os.environ.get("SERPAPI_KEY")
         if not api_key:
-            raise ValueError("SERPAPI_KEY environment variable not set")
+            return {"error": "SERPAPI_KEY environment variable not set. Please set it in your .env file."}
         
         # Parameters for the search
         params = {
@@ -243,7 +243,7 @@ def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
         }
         
         # Send request
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         
         # Parse the response
@@ -280,7 +280,7 @@ def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
         return results[:num_results]
     except Exception as e:
         logger.error(f"Search error: {str(e)}")
-        raise ValueError(f"Failed to execute search '{query}': {str(e)}")
+        return {"error": f"Failed to execute search '{query}': {str(e)}"}
 
 @register_tool
 def http_request(
