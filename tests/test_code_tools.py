@@ -7,16 +7,14 @@ from miniagent.utils.text_utils import smart_truncate
 
 
 @pytest.fixture
-def tmp_workspace(tmp_path):
+def tmp_workspace(tmp_path, monkeypatch):
     """Create a temporary workspace with sample files."""
     (tmp_path / "hello.py").write_text("print('hello')\nprint('world')\n")
     (tmp_path / "data.txt").write_text("line1\nline2\nline3\n")
     (tmp_path / "sub").mkdir()
     (tmp_path / "sub" / "nested.py").write_text("import os\n")
-    original = os.getcwd()
-    os.chdir(tmp_path)
+    monkeypatch.chdir(tmp_path)
     yield tmp_path
-    os.chdir(original)
 
 
 class TestRead:
@@ -89,6 +87,13 @@ class TestBash:
 
     def test_timeout(self, tmp_workspace):
         result = bash("sleep 10", timeout=1)
+        assert result["exit_code"] == 1
+        assert "timed out" in result["stderr"].lower()
+
+    def test_bash_timeout_from_env(self, tmp_workspace, monkeypatch):
+        """bash() with timeout=0 should read BASH_TIMEOUT env var."""
+        monkeypatch.setenv("BASH_TIMEOUT", "1")
+        result = bash("sleep 10", timeout=0)
         assert result["exit_code"] == 1
         assert "timed out" in result["stderr"].lower()
 

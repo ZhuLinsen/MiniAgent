@@ -88,7 +88,7 @@ def parse_json(json_str: str) -> Union[Dict, List]:
             # Replace actual newlines within string values with \\n
             fixed_json = _fix_unescaped_newlines(json_str)
             return json.loads(fixed_json)
-        except (json.JSONDecodeError, Exception):
+        except (json.JSONDecodeError, ValueError):
             pass
 
         # Try to fix common issues and parse again

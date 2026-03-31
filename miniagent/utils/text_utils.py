@@ -15,8 +15,10 @@ def smart_truncate(text: str, limit: int) -> str:
     """
     if len(text) <= limit:
         return text
+    if limit < 100:
+        return text[:limit] + "..."
     head_size = int(limit * 0.7)
-    tail_size = limit - head_size - 80
+    tail_size = max(1, limit - head_size - 80)
     return (
         text[:head_size]
         + f"\n\n... [truncated {len(text) - head_size - tail_size} chars, {len(text)} total] ...\n\n"

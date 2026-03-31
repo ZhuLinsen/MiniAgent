@@ -188,16 +188,18 @@ def grep(pattern: str, path: str = ".") -> List[Dict[str, Any]]:  # noqa: A002
 
 
 @register_tool
-def bash(cmd: str, timeout: int = 120) -> Dict[str, Any]:
+def bash(cmd: str, timeout: int = 0) -> Dict[str, Any]:
     """Execute a shell command.
 
     Args:
         cmd: Shell command string.
-        timeout: Maximum execution time in seconds (default 120).
+        timeout: Maximum execution time in seconds (0 = use BASH_TIMEOUT env var, default 120).
 
     Returns:
         Dict containing exit_code, stdout, stderr.
     """
+    if timeout <= 0:
+        timeout = int(os.environ.get("BASH_TIMEOUT", "120"))
     MAX_OUTPUT = int(os.environ.get("BASH_MAX_OUTPUT", "50000"))
     try:
         completed = subprocess.run(

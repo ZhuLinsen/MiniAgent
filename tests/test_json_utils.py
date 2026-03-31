@@ -85,3 +85,60 @@ class TestExtractToolCall:
     def test_returns_none_for_empty_dict(self):
         result = extract_tool_call({})
         assert result is None
+
+
+class TestCleanJsonString:
+    """Tests for clean_json_string()."""
+
+    def test_removes_line_comments(self):
+        from miniagent.utils.json_utils import clean_json_string
+        result = clean_json_string('{"a": 1} // comment')
+        assert "//" not in result
+        assert '"a"' in result
+
+    def test_removes_block_comments(self):
+        from miniagent.utils.json_utils import clean_json_string
+        result = clean_json_string('{"a": /* comment */ 1}')
+        assert "/*" not in result
+
+    def test_removes_trailing_commas(self):
+        from miniagent.utils.json_utils import clean_json_string
+        import json
+        result = clean_json_string('{"a": 1, "b": 2,}')
+        parsed = json.loads(result)
+        assert parsed == {"a": 1, "b": 2}
+
+    def test_empty_string(self):
+        from miniagent.utils.json_utils import clean_json_string
+        assert clean_json_string("") == ""
+
+    def test_trailing_comma_in_array(self):
+        from miniagent.utils.json_utils import clean_json_string
+        import json
+        result = clean_json_string('[1, 2, 3,]')
+        parsed = json.loads(result)
+        assert parsed == [1, 2, 3]
+
+
+class TestParseJsonEdgeCases:
+    """Edge cases for parse_json()."""
+
+    def test_empty_string_returns_empty_dict(self):
+        assert parse_json("") == {}
+
+    def test_none_returns_empty_dict(self):
+        assert parse_json(None) == {}
+
+    def test_list_json(self):
+        result = parse_json('[1, 2, 3]')
+        assert result == [1, 2, 3]
+
+    def test_json_with_unescaped_newlines(self):
+        """JSON with literal newlines in strings should still parse."""
+        text = '{"code": "line1\\nline2"}'
+        result = parse_json(text)
+        assert "line1" in result.get("code", "")
+
+    def test_deeply_nested(self):
+        result = parse_json('{"a": {"b": {"c": 1}}}')
+        assert result["a"]["b"]["c"] == 1

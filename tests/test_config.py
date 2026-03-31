@@ -47,3 +47,22 @@ class TestLoadConfig:
         assert config.bash_timeout == 300
         assert config.bash_max_output == 100000
         assert config.tool_result_limit == 32000
+
+    def test_confirm_dangerous_true(self, monkeypatch):
+        monkeypatch.setenv("LLM_API_KEY", "k")
+        monkeypatch.setenv("CONFIRM_DANGEROUS", "true")
+        config = load_config()
+        assert config.confirm_dangerous is True
+
+    def test_confirm_dangerous_false(self, monkeypatch):
+        monkeypatch.setenv("LLM_API_KEY", "k")
+        monkeypatch.setenv("CONFIRM_DANGEROUS", "false")
+        config = load_config()
+        assert config.confirm_dangerous is False
+
+    def test_no_api_key_at_all(self, monkeypatch):
+        """Config should still load when no API key is set."""
+        for key in ("LLM_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY"):
+            monkeypatch.delenv(key, raising=False)
+        config = load_config()
+        assert config.llm.api_key is None or config.llm.api_key == ""

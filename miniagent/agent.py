@@ -352,12 +352,7 @@ If the question is outside the scope of the available tools, use your knowledge 
                 if brace_count == 0:
                     return text[start:i+1]
 
-        # If we didn't find balanced braces, return everything from start to end
-        # This handles cases where the JSON might be truncated
-        if brace_count > 0:
-            logger.debug(f"Unbalanced braces (count={brace_count}), returning partial JSON")
-            return None
-
+        logger.debug(f"Unbalanced braces (count={brace_count}), cannot extract JSON")
         return None
     
     def _execute_tool(

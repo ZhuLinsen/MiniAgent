@@ -118,10 +118,14 @@ Example: [{{"role": "researcher", "task": "Find best practices for X"}}, {{"role
 Keep it simple. Don't over-decompose.""",
         )
 
-        response = planner._call_llm([
-            {"role": "system", "content": planner.system_prompt},
-            {"role": "user", "content": task},
-        ])
+        try:
+            response = planner._call_llm([
+                {"role": "system", "content": planner.system_prompt},
+                {"role": "user", "content": task},
+            ])
+        except Exception as e:
+            logger.error(f"LLM call for planning failed: {e}")
+            return [{"role": list(self.roles.keys())[0] if self.roles else "coder", "task": task}]
 
         # Parse the plan from response
         try:

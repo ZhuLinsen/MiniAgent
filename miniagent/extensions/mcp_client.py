@@ -67,11 +67,19 @@ class MCPClient:
         logger.info(f"MCP server started: {self.command}")
 
     def stop(self) -> None:
-        """Stop the MCP server process."""
+        """Stop the MCP server process and clean up resources."""
         if self._process:
-            self._process.terminate()
-            self._process.wait(timeout=5)
-            self._process = None
+            try:
+                self._process.terminate()
+                try:
+                    self._process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self._process.kill()
+                    self._process.wait()
+            finally:
+                self._process = None
+        if self._reader_thread and self._reader_thread.is_alive():
+            self._reader_thread.join(timeout=2)
         logger.info("MCP server stopped")
 
     def list_tools(self) -> List[Dict[str, Any]]:

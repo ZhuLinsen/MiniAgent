@@ -86,6 +86,19 @@ class TestSmartTruncate:
         assert "START" in result
         assert "truncated" in result
 
+    def test_very_small_limit(self):
+        """smart_truncate with limit < 100 should not produce negative tail_size."""
+        text = "A" * 200
+        result = smart_truncate(text, 50)
+        assert len(result) <= 54  # 50 + "..."
+        assert result.endswith("...")
+
+    def test_limit_exactly_100(self):
+        text = "B" * 300
+        result = smart_truncate(text, 100)
+        assert "truncated" in result
+        assert len(result) < 300
+
 
 class TestCheckDangerous:
     @patch("miniagent.agent.MiniAgent._init_llm_client")
