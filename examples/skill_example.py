@@ -12,13 +12,14 @@ Usage:
     python examples/skill_example.py
 """
 
-from miniagent import MiniAgent, Skill, register_skill, list_skills
+from miniagent import MiniAgent, Skill, register_skill, get_skill, list_skills
 
 
 def show_builtin_skills():
     """List all available skills."""
     print("=== Built-in Skills ===")
-    for name, skill in list_skills().items():
+    for name in list_skills():
+        skill = get_skill(name)
         tools = ", ".join(skill.tools) if skill.tools else "all"
         print(f"  {name}: tools=[{tools}], temperature={skill.temperature}")
     print()
@@ -36,7 +37,7 @@ def use_builtin_skill():
     # Load "coder" skill — sets coding-focused prompt and filters tools
     agent.load_skill("coder")
     print(f"Loaded skill 'coder'. Agent now has {len(agent.tools)} tools.")
-    print(f"Tools: {list(agent.tools.keys())}")
+    print(f"Tools: {[t['name'] for t in agent.tools]}")
     print()
 
 
@@ -57,7 +58,7 @@ def register_custom_skill():
     agent.load_all_tools()
     agent.load_skill("devops")
     print(f"Loaded custom skill 'devops'. Agent now has {len(agent.tools)} tools.")
-    print(f"Tools: {list(agent.tools.keys())}")
+    print(f"Tools: {[t['name'] for t in agent.tools]}")
 
 
 if __name__ == "__main__":

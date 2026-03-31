@@ -53,6 +53,16 @@ That's the power of minimalism: let the LLM do what it does best — **think and
 
 ## Quick Start
 
+```bash
+git clone https://github.com/ZhuLinsen/MiniAgent.git && cd MiniAgent
+pip install -r requirements.txt && pip install -e .
+cp .env.example .env  # Fill in your API Key
+miniagent              # Launch!
+```
+
+<details>
+<summary>📋 Detailed Installation</summary>
+
 ### Installation
 
 ```bash
@@ -77,6 +87,8 @@ LLM_API_BASE=https://api.deepseek.com/v1
 ```bash
 miniagent          # or python -m miniagent
 ```
+
+</details>
 
 ```
 you: Create a hello.py file

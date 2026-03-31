@@ -120,7 +120,7 @@ def system_info() -> Dict[str, Any]:
                     with open('/etc/os-release', 'r') as f:
                         os_release = dict(line.strip().split('=', 1) for line in f if '=' in line)
                     info["distribution"] = os_release.get('PRETTY_NAME', '').strip('"')
-                except:
+                except (OSError, ValueError):
                     pass
                     
         return info
@@ -318,7 +318,7 @@ def http_request(
         # Prepare response data
         try:
             response_data = response.json()
-        except:
+        except (ValueError, TypeError):
             response_data = response.text
             
         return {

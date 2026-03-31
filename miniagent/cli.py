@@ -11,7 +11,6 @@ set_cli_mode(True)
 
 import argparse
 import os
-import sys
 from typing import Any, Dict, List, Optional
 
 from rich.console import Console
@@ -19,9 +18,8 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.status import Status
-from rich.style import Style
-from rich.text import Text
 
+from . import __version__
 from .agent import MiniAgent
 from .config import load_config
 from .logger import get_logger
@@ -212,7 +210,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     Environment variables (LLM_API_KEY, LLM_MODEL, LLM_API_BASE) can be set
     in a ``.env`` file or exported directly.
     """
-    parser = argparse.ArgumentParser(prog="miniagent", description="MiniAgent interactive CLI")
+    parser = argparse.ArgumentParser(prog="miniagent", description="MiniAgent - Minimalist CLI Agent Framework")
+    parser.add_argument("--version", "-V", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--config", help="Path to config JSON")
     parser.add_argument("--model", help="Override model name")
     parser.add_argument("--api-key", help="Override API key")
