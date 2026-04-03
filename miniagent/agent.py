@@ -4,6 +4,7 @@ import os
 import json
 import re
 from typing import Any, Callable, Dict, Generator, List, Optional
+import requests
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 from .logger import get_logger
@@ -107,6 +108,7 @@ If the question is outside the scope of the available tools, use your knowledge 
         self.api_key = api_key
         self.base_url = base_url
         self.temperature = temperature
+        self._api_mode = os.environ.get("LLM_API_MODE", "").strip().lower()
         self.system_prompt = system_prompt
         self.tools = []
         self.client = None
@@ -144,6 +146,148 @@ If the question is outside the scope of the available tools, use your knowledge 
         except Exception as e:
             logger.error(f"Failed to initialize LLM client: {e}")
             raise
+
+    def _use_direct_chat_endpoint(self) -> bool:
+        """Return True when ``base_url`` should be treated as the exact POST endpoint."""
+        if self._api_mode in {"direct", "raw", "single"}:
+            return True
+        if not self.base_url:
+            return False
+
+        normalized = self.base_url.rstrip("/").lower()
+        return normalized.endswith("/publicservice") or normalized.endswith("/chat/completions")
+
+    def _build_chat_payload(self, messages: List[Dict[str, str]], stream: bool = False) -> Dict[str, Any]:
+        """Build a chat payload shared by OpenAI-compatible and direct endpoints."""
+        payload: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+        }
+
+        if stream:
+            payload["stream"] = True
+
+        max_tokens = os.environ.get("LLM_MAX_TOKENS")
+        if max_tokens:
+            try:
+                payload["max_tokens"] = int(max_tokens)
+            except ValueError:
+                logger.warning(f"Invalid LLM_MAX_TOKENS={max_tokens!r}, ignoring")
+
+        top_p = os.environ.get("LLM_TOP_P")
+        if top_p:
+            try:
+                payload["top_p"] = float(top_p)
+            except ValueError:
+                logger.warning(f"Invalid LLM_TOP_P={top_p!r}, ignoring")
+
+        n = os.environ.get("LLM_N")
+        if n:
+            try:
+                payload["n"] = int(n)
+            except ValueError:
+                logger.warning(f"Invalid LLM_N={n!r}, ignoring")
+
+        stop = os.environ.get("LLM_STOP")
+        if stop:
+            try:
+                payload["stop"] = json.loads(stop)
+            except json.JSONDecodeError:
+                payload["stop"] = stop
+
+        return payload
+
+    @staticmethod
+    def _coerce_response_text(value: Any) -> Optional[str]:
+        """Extract plain text from common OpenAI-compatible response shapes."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        if isinstance(value, list):
+            parts: List[str] = []
+            for item in value:
+                if isinstance(item, str):
+                    parts.append(item)
+                    continue
+                if not isinstance(item, dict):
+                    continue
+                text = item.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+                    continue
+                content = item.get("content")
+                if isinstance(content, str):
+                    parts.append(content)
+            return "".join(parts) if parts else None
+        if isinstance(value, dict):
+            for key in ("text", "content", "value"):
+                text = value.get(key)
+                if isinstance(text, str):
+                    return text
+        return None
+
+    @classmethod
+    def _extract_response_text(cls, payload: Any) -> Optional[str]:
+        """Handle several response layouts used by OpenAI-compatible gateways."""
+        if not isinstance(payload, dict):
+            return None
+
+        choices = payload.get("choices")
+        if isinstance(choices, list) and choices:
+            choice = choices[0]
+            if isinstance(choice, dict):
+                message = choice.get("message")
+                if isinstance(message, dict):
+                    text = cls._coerce_response_text(message.get("content"))
+                    if text is not None:
+                        return text
+                text = cls._coerce_response_text(choice.get("text"))
+                if text is not None:
+                    return text
+
+        for key in ("output_text", "text", "content", "result", "response"):
+            text = cls._coerce_response_text(payload.get(key))
+            if text is not None:
+                return text
+
+        nested = payload.get("data")
+        if nested is not None:
+            return cls._extract_response_text(nested)
+
+        return None
+
+    def _call_direct_llm(self, messages: List[Dict[str, str]]) -> str:
+        """Call a single direct chat endpoint without appending OpenAI resource paths."""
+        if not self.base_url:
+            raise ValueError("Direct endpoint mode requires LLM_API_BASE to be set.")
+
+        timeout = int(os.environ.get("LLM_TIMEOUT", "60"))
+        payload = self._build_chat_payload(messages)
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "content-type": "application/json",
+        }
+        url = self.base_url.rstrip("/")
+
+        logger.debug(f"Calling direct LLM endpoint: {url}")
+        response = requests.post(url, headers=headers, json=payload, timeout=timeout)
+        response.raise_for_status()
+
+        try:
+            data = response.json()
+        except ValueError:
+            raw_text = response.text.strip()
+            if raw_text:
+                return raw_text
+            raise
+
+        content = self._extract_response_text(data)
+        if content is None:
+            snippet = smart_truncate(json.dumps(data, ensure_ascii=False), 500)
+            raise ValueError(f"Unsupported direct endpoint response format: {snippet}")
+        return content
     
     def add_tool(self, tool: Dict[str, Any]) -> None:
         """
@@ -412,6 +556,9 @@ If the question is outside the scope of the available tools, use your knowledge 
             
             # Apply reflection if enabled
             messages = self._maybe_reflect(messages)
+
+            if self._use_direct_chat_endpoint():
+                return self._call_direct_llm(messages)
                 
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -437,6 +584,12 @@ If the question is outside the scope of the available tools, use your knowledge 
             raise ValueError("API key is not set.")
         
         messages = self._maybe_reflect(messages)
+
+        if self._use_direct_chat_endpoint():
+            # Most single-endpoint gateways do not expose an SSE stream API.
+            # Fall back to one-shot completion so the CLI still works.
+            yield self._call_direct_llm(messages)
+            return
         
         response = self.client.chat.completions.create(
             model=self.model,
@@ -659,6 +812,15 @@ If the question is outside the scope of the available tools, use your knowledge 
             Final response text
         """
         logger.info(f"Starting native FC query: {query}")
+
+        if self._use_direct_chat_endpoint():
+            logger.warning("Direct chat endpoint detected; falling back to text-mode tool calling")
+            return self.run_with_tools(
+                query,
+                max_iterations=max_iterations,
+                tool_callback=tool_callback,
+                status_callback=status_callback,
+            )
         
         # Build OpenAI-format tool schemas
         tool_schemas = [{
@@ -736,13 +898,13 @@ If the question is outside the scope of the available tools, use your knowledge 
     def run(self, query: str, max_iterations: int = 10, mode: str = "text") -> str:
         """
         Execute the Agent with specified tool calling mode.
-        
+
         Args:
             query: User query text
             max_iterations: Maximum number of iterations
             mode: Tool calling mode — "text" (default, transparent parsing) 
                   or "native" (OpenAI function calling)
-            
+
         Returns:
             Agent response text
         """

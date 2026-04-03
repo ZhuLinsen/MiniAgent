@@ -139,3 +139,78 @@ def test_safe_execute_tool_rejected(agent):
     result, rejected = agent._safe_execute_tool(tc, None, None, 16000)
     assert rejected is True
     assert result is None
+
+
+def test_detect_direct_endpoint_by_suffix():
+    """A single POST endpoint should be treated as a direct chat endpoint."""
+    with patch("miniagent.agent.MiniAgent._init_llm_client"):
+        agent = MiniAgent(
+            model="DeepSeek-R1",
+            api_key="fake-key",
+            base_url="https://example.com/publicService",
+        )
+
+    assert agent._use_direct_chat_endpoint() is True
+
+
+def test_call_llm_direct_endpoint_uses_requests_post():
+    """Direct endpoint mode should POST to the exact configured URL."""
+    with patch("miniagent.agent.MiniAgent._init_llm_client"), patch("miniagent.agent.requests.post") as mock_post:
+        mock_response = Mock()
+        mock_response.raise_for_status = Mock()
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": "hello from gateway"}}]
+        }
+        mock_post.return_value = mock_response
+
+        agent = MiniAgent(
+            model="DeepSeek-R1",
+            api_key="fake-key",
+            base_url="https://example.com/publicService",
+        )
+
+        result = agent._call_llm([{"role": "user", "content": "hi"}])
+
+    assert result == "hello from gateway"
+    mock_post.assert_called_once()
+    assert mock_post.call_args.args[0] == "https://example.com/publicService"
+    assert mock_post.call_args.kwargs["headers"]["Authorization"] == "Bearer fake-key"
+    assert mock_post.call_args.kwargs["json"]["model"] == "DeepSeek-R1"
+    assert mock_post.call_args.kwargs["json"]["messages"][0]["content"] == "hi"
+
+
+def test_call_llm_stream_direct_endpoint_yields_single_chunk():
+    """Streaming should degrade gracefully when only a direct endpoint exists."""
+    with patch("miniagent.agent.MiniAgent._init_llm_client"), patch("miniagent.agent.requests.post") as mock_post:
+        mock_response = Mock()
+        mock_response.raise_for_status = Mock()
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": "stream fallback"}}]
+        }
+        mock_post.return_value = mock_response
+
+        agent = MiniAgent(
+            model="DeepSeek-R1",
+            api_key="fake-key",
+            base_url="https://example.com/publicService",
+        )
+
+        chunks = list(agent._call_llm_stream([{"role": "user", "content": "hi"}]))
+
+    assert chunks == ["stream fallback"]
+
+
+def test_native_tools_fall_back_to_text_mode_for_direct_endpoint():
+    """Native FC should fall back to text mode for single-endpoint gateways."""
+    with patch("miniagent.agent.MiniAgent._init_llm_client"):
+        agent = MiniAgent(
+            model="DeepSeek-R1",
+            api_key="fake-key",
+            base_url="https://example.com/publicService",
+        )
+
+    agent.run_with_tools = Mock(return_value="fallback response")
+    result = agent.run_with_native_tools("hi")
+
+    assert result == "fallback response"
+    agent.run_with_tools.assert_called_once()
