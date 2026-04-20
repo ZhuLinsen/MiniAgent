@@ -4,7 +4,15 @@ import pytest
 from dataclasses import fields as dataclass_fields
 from unittest.mock import MagicMock, patch
 
-from miniagent.skills import Skill, register_skill, get_skill, list_skills
+from miniagent.skills import (
+    Skill,
+    register_skill,
+    get_skill,
+    get_skill_meta,
+    list_skills,
+    _SKILLS,
+    _SKILL_META,
+)
 
 
 class TestSkillDataclass:
@@ -43,6 +51,13 @@ class TestSkillRegistry:
     def test_get_skill_missing(self):
         assert get_skill("nonexistent_skill_xyz") is None
 
+    def test_get_skill_metadata_existing(self):
+        meta = get_skill_meta("coder")
+        assert meta is not None
+        assert meta.source == "builtin"
+        assert meta.pack_name == "builtin"
+        assert meta.module == "miniagent.skills"
+
     def test_list_skills_contains_builtins(self):
         names = list_skills()
         for expected in ("coder", "researcher", "reviewer", "tester"):
@@ -53,6 +68,31 @@ class TestSkillRegistry:
         assert coder is not None
         assert "read" in coder.tools
         assert "bash" in coder.tools
+
+    def test_register_skill_duplicate_raises(self):
+        skill = Skill(name="__test_duplicate_skill__", prompt="p")
+        register_skill(skill)
+
+        with pytest.raises(ValueError, match="already registered"):
+            register_skill(skill)
+
+        del _SKILLS[skill.name]
+        del _SKILL_META[skill.name]
+
+    def test_register_skill_allow_override_updates_skill(self):
+        original = Skill(name="__test_override_skill__", prompt="p1")
+        replacement = Skill(name="__test_override_skill__", prompt="p2")
+        register_skill(original)
+        register_skill(replacement, allow_override=True)
+
+        assert get_skill("__test_override_skill__") is replacement
+        meta = get_skill_meta("__test_override_skill__")
+        assert meta is not None
+        assert meta.source == "runtime"
+        assert meta.module == __name__
+
+        del _SKILLS[replacement.name]
+        del _SKILL_META[replacement.name]
 
 
 class TestAgentLoadSkill:

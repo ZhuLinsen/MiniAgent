@@ -17,6 +17,10 @@ __version__ = "0.1.0"
 __all__ = [
     "MiniAgent",
     "Orchestrator",
+    "load_pack",
+    "load_packs",
+    "resolve_runtime",
+    "RuntimeOverride",
     "load_mcp_tools",
     "Skill",
     "register_skill",
@@ -31,7 +35,19 @@ def __getattr__(name: str) -> Any:
     if name == "Orchestrator":
         from .orchestrator import Orchestrator
         return Orchestrator
+    if name == "load_pack":
+        from .pack_loader import load_pack
+        return load_pack
+    if name == "load_packs":
+        from .pack_loader import load_packs
+        return load_packs
     if name == "load_mcp_tools":
         from .mcp_client import load_mcp_tools
         return load_mcp_tools
+    if name == "resolve_runtime":
+        from .resolver import resolve_runtime
+        return resolve_runtime
+    if name == "RuntimeOverride":
+        from .resolver import RuntimeOverride
+        return RuntimeOverride
     raise AttributeError(name)

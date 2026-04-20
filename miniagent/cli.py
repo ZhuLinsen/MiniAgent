@@ -24,6 +24,7 @@ from .agent import MiniAgent
 from .config import load_config
 from .logger import get_logger
 from .memory import Memory
+from .resolver import RuntimeOverride, resolve_runtime
 
 logger = get_logger(__name__)
 
@@ -151,13 +152,14 @@ def _status_callback(status_text: str) -> None:
         _current_status.update(f"[dim]{status_text}[/dim]")
 
 
-def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
+def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory, Any, bool]:
     cfg = load_config(args.config)
+    if getattr(args, "strict_resolution", False):
+        cfg.strict_resolution = True
 
     model = args.model or cfg.llm.model
     api_key = args.api_key or cfg.llm.api_key
     base_url = args.base_url or cfg.llm.api_base
-    temperature = args.temperature if args.temperature is not None else cfg.llm.temperature
 
     if not api_key:
         console.print("[bold red]❌ Missing API Key[/bold red]")
@@ -174,7 +176,17 @@ def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
     memory = Memory()
     memory.load()
 
-    system_prompt = cfg.system_prompt
+    resolved = resolve_runtime(
+        cfg,
+        RuntimeOverride(
+            packs=args.pack,
+            profile=args.profile,
+            tools=args.tool,
+            skill=args.skill,
+            temperature=args.temperature,
+        ),
+    )
+    system_prompt = resolved.system_prompt
     mem_ctx = memory.context()
     if mem_ctx:
         system_prompt = system_prompt.rstrip() + "\n\n" + mem_ctx
@@ -190,20 +202,18 @@ def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
         model=model,
         api_key=api_key,
         base_url=base_url,
-        temperature=temperature,
+        temperature=resolved.temperature,
         system_prompt=system_prompt,
         use_reflector=cfg.enable_reflection,
         confirm_dangerous=cfg.confirm_dangerous,
         confirm_callback=_confirm_dangerous,
     )
 
-    # Load some default tools if configured, else fall back to all currently registered.
     agent.tools = []
-    tools = cfg.default_tools or agent.get_available_tools()
-    for tool_name in tools:
+    for tool_name in resolved.tool_names:
         agent.load_builtin_tool(tool_name)
 
-    return agent, memory
+    return agent, memory, resolved.report, cfg.strict_resolution
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -220,17 +230,42 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--api-key", help="Override API key")
     parser.add_argument("--base-url", help="Override base URL")
     parser.add_argument("--temperature", type=float, help="Override temperature")
+    parser.add_argument("--profile", help="Select a configured deployment profile")
+    parser.add_argument("--skill", help="Override the active skill")
+    parser.add_argument("--pack", action="append", help="Add an external pack module")
+    parser.add_argument("--tool", action="append", help="Explicitly enable a tool")
+    parser.add_argument("--strict-resolution", action="store_true", help="Fail startup when bootstrap diagnostics contain errors")
     args = parser.parse_args(argv)
 
     try:
-        agent, memory = _build_agent(args)
+        agent, memory, bootstrap_report, strict_mode = _build_agent(args)
+        if bootstrap_report.has_errors():
+            report_text = bootstrap_report.render_text("user")
+            if report_text:
+                console.print(Panel(report_text, title="Bootstrap Errors", border_style="red"))
+            return 1
     except SystemExit:
         raise
     except Exception as e:
         console.print(f"[red]error:[/red] {e}")
         return 1
 
-    console.print(f"[dim]model:[/dim] {agent.model}  [dim]tools:[/dim] {len(agent.tools)}  [dim]type /help for commands[/dim]")
+    startup_bits = [
+        f"[dim]model:[/dim] {agent.model}",
+        f"[dim]tools:[/dim] {len(agent.tools)}",
+    ]
+    if bootstrap_report.selected_profile:
+        startup_bits.append(f"[dim]profile:[/dim] {bootstrap_report.selected_profile}")
+    if bootstrap_report.selected_skill:
+        startup_bits.append(f"[dim]skill:[/dim] {bootstrap_report.selected_skill}")
+    startup_bits.append("[dim]type /help for commands[/dim]")
+    console.print("  ".join(startup_bits))
+
+    report_text = bootstrap_report.render_text("user")
+    if report_text:
+        border = "yellow" if bootstrap_report.diagnostics else "blue"
+        title = "Bootstrap Warnings" if bootstrap_report.diagnostics else "Bootstrap"
+        console.print(Panel(report_text, title=title, border_style=border))
     
     # Streaming flag — can be toggled with /stream
     use_streaming = os.environ.get("MINIAGENT_STREAM", "1") != "0"
@@ -277,13 +312,24 @@ def main(argv: Optional[List[str]] = None) -> int:
         if user_text in ("/help", "help"):
             console.print("[bold]Commands:[/bold]")
             console.print("  /help    show this help")
+            console.print("  /bootstrap  show startup profile/skill/tool diagnostics")
             console.print("  /c       clear conversation history")
             console.print("  /stream  toggle streaming output")
             console.print("  /model   switch LLM model")
             console.print("  /mode    toggle text/native FC mode")
             console.print("  /tools   list loaded tools")
             console.print("  /q       quit")
-            console.print(f"\n[dim]model: {agent.model} | mode: {run_mode} | streaming: {'on' if use_streaming else 'off'} | tools: {len(agent.tools)}[/dim]")
+            console.print(
+                f"\n[dim]model: {agent.model} | mode: {run_mode} | streaming: {'on' if use_streaming else 'off'} | "
+                f"strict: {'on' if strict_mode else 'off'} | tools: {len(agent.tools)}[/dim]"
+            )
+            continue
+        if user_text == "/bootstrap":
+            console.print(Panel(
+                bootstrap_report.render_text("user") or "No bootstrap diagnostics.",
+                title="Bootstrap",
+                border_style="blue",
+            ))
             continue
         if user_text == "/tools":
             console.print(f"[bold]Loaded Tools ({len(agent.tools)}):[/bold]")

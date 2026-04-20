@@ -41,6 +41,11 @@ class AgentConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     system_prompt: str = "You are a helpful AI assistant."
     default_tools: List[str] = field(default_factory=list)
+    packs: List[str] = field(default_factory=list)
+    profile: Optional[str] = None
+    profiles: Dict[str, "ProfileConfig"] = field(default_factory=dict)
+    default_skill: Optional[str] = None
+    strict_resolution: bool = False
     enable_reflection: bool = False
     reflection_system_prompt: Optional[str] = None
     reflection_max_iterations: int = 3
@@ -51,6 +56,42 @@ class AgentConfig:
     tool_result_limit: int = 16000   # TOOL_RESULT_LIMIT: tool result truncation limit
     max_context_messages: int = 20   # MAX_CONTEXT_MESSAGES: auto-compress conversation after N messages
     confirm_dangerous: bool = True   # CONFIRM_DANGEROUS: require confirmation for dangerous commands
+
+
+@dataclass
+class ProfileConfig:
+    """Deployment profile describing packs, tools, and skill selection."""
+
+    packs: List[str] = field(default_factory=list)
+    tools: List[str] = field(default_factory=list)
+    skill: Optional[str] = None
+    system_prompt: Optional[str] = None
+    temperature: Optional[float] = None
+
+
+def _safe_bool(value: Any, default: bool = False) -> bool:
+    """Best-effort conversion of common bool-like values."""
+
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() not in ("0", "false", "no", "")
+    return bool(value)
+
+
+def _load_profile_config(data: Any) -> "ProfileConfig":
+    """Normalize one profile definition from JSON data."""
+
+    profile = ProfileConfig()
+    if not isinstance(data, dict):
+        return profile
+
+    for key, value in data.items():
+        if hasattr(profile, key):
+            setattr(profile, key, value)
+    return profile
 
 def load_config(config_path: Optional[str] = None) -> AgentConfig:
     """
@@ -117,11 +158,15 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
     config.tool_result_limit = _safe_int("TOOL_RESULT_LIMIT", config.tool_result_limit)
     config.max_context_messages = _safe_int("MAX_CONTEXT_MESSAGES", config.max_context_messages)
     if os.environ.get("CONFIRM_DANGEROUS") is not None:
-        config.confirm_dangerous = os.environ["CONFIRM_DANGEROUS"].lower() not in ("0", "false", "no")
+        config.confirm_dangerous = _safe_bool(os.environ["CONFIRM_DANGEROUS"], config.confirm_dangerous)
     if os.environ.get("ENABLE_REFLECTION") is not None:
-        config.enable_reflection = os.environ["ENABLE_REFLECTION"].lower() not in ("0", "false", "no")
+        config.enable_reflection = _safe_bool(os.environ["ENABLE_REFLECTION"], config.enable_reflection)
     if os.environ.get("REFLECTION_MAX_ITERATIONS"):
         config.reflection_max_iterations = _safe_int("REFLECTION_MAX_ITERATIONS", config.reflection_max_iterations)
+    if os.environ.get("STRICT_RESOLUTION") is not None:
+        config.strict_resolution = _safe_bool(os.environ["STRICT_RESOLUTION"], config.strict_resolution)
+    if os.environ.get("MINIAGENT_PROFILE"):
+        config.profile = os.environ["MINIAGENT_PROFILE"]
         
     # Determine likely provider based on API_BASE and set appropriate default model
     if config.llm.api_base:
@@ -152,7 +197,12 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
                     
         # Load agent configuration
         for key, value in config_data.items():
-            if key != "llm" and hasattr(config, key):
+            if key == "profiles" and isinstance(value, dict):
+                config.profiles = {
+                    name: _load_profile_config(profile_data)
+                    for name, profile_data in value.items()
+                }
+            elif key != "llm" and hasattr(config, key):
                 setattr(config, key, value)
                 
         logger.info(f"Configuration loaded from {config_path}")

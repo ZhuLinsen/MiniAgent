@@ -368,12 +368,23 @@ If the question is outside the scope of the available tools, use your knowledge 
             logger.warning(f"Skill not found: {skill_name}")
             return False
         
+        if self.system_prompt != skill.prompt:
+            logger.warning(f"Skill '{skill_name}' replaced the active system prompt")
         self.system_prompt = skill.prompt
         if skill.temperature is not None:
+            if self.temperature != skill.temperature:
+                logger.warning(f"Skill '{skill_name}' replaced the active temperature")
             self.temperature = skill.temperature
         # Filter tools to skill whitelist
         if skill.tools is not None:
+            current_names = [t["name"] for t in self.tools]
+            filtered_out = [name for name in current_names if name not in skill.tools]
+            missing = [name for name in skill.tools if name not in current_names]
             self.tools = [t for t in self.tools if t["name"] in skill.tools]
+            if filtered_out:
+                logger.warning(f"Skill '{skill_name}' filtered out tools: {filtered_out}")
+            if missing:
+                logger.warning(f"Skill '{skill_name}' references tools not loaded on the agent: {missing}")
             logger.info(f"Skill '{skill_name}' filtered tools to: {[t['name'] for t in self.tools]}")
         
         logger.info(f"Loaded skill: {skill_name}")

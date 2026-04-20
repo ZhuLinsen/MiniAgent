@@ -231,6 +231,46 @@ register_skill(Skill(
 ))
 ```
 
+## External Packs and Deployment Profiles
+
+Domain-specific `tools/skills` can live in separate Python packages. MiniAgent keeps the built-in layout unchanged and only resolves the final active capability set at startup.
+
+```python
+# examples/miniagent_demo_pack/pack.py
+PACK_NAME = "demo"
+PACK_VERSION = "0.1.0"
+
+def register():
+    from . import tools, skills
+```
+
+```json
+{
+  "packs": ["examples.miniagent_demo_pack"],
+  "profile": "demo_ops",
+  "profiles": {
+    "default": {
+      "tools": ["read", "write", "edit", "bash", "grep", "glob"],
+      "skill": "coder"
+    },
+    "demo_ops": {
+      "packs": ["examples.miniagent_demo_pack"],
+      "tools": ["read", "grep", "bash", "demo_customer_lookup"],
+      "skill": "demo_operator"
+    }
+  }
+}
+```
+
+You can switch explicitly in the CLI:
+
+```bash
+miniagent --config examples/config_example.json --profile demo_ops
+miniagent --pack examples.miniagent_demo_pack --skill demo_operator --tool demo_customer_lookup
+```
+
+If MiniAgent has to apply implicit behavior, such as falling back to a skill whitelist or filtering tools requested by a profile, it prints bootstrap warnings at startup instead of doing it silently.
+
 ## Custom Tools
 
 ```python

@@ -21,6 +21,7 @@ def basic_orchestration():
         model="deepseek-chat",
         api_key="your_api_key",
         base_url="https://api.deepseek.com/v1",
+        packs=["examples.miniagent_demo_pack"],  # optional external pack modules for worker bootstrap
     )
 
     # The orchestrator will automatically:

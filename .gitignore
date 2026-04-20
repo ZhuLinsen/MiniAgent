@@ -251,3 +251,4 @@ cython_debug/
 *.swp
 
 miniagent/docs/
+.codex

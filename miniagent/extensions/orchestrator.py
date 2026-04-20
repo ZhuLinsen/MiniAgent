@@ -20,8 +20,10 @@ import json
 from typing import Any, Callable, Dict, List, Optional
 
 from ..agent import MiniAgent
-from ..skills import get_skill, list_skills, Skill
+from ..config import AgentConfig, LLMConfig
+from ..diagnostics import BootstrapReport
 from ..logger import get_logger
+from ..resolver import resolve_runtime
 
 logger = get_logger(__name__)
 
@@ -50,6 +52,8 @@ class Orchestrator:
         base_url: Optional[str] = None,
         temperature: float = 0.7,
         worker_roles: Optional[Dict[str, str]] = None,
+        packs: Optional[List[str]] = None,
+        strict_resolution: bool = False,
         **kwargs,
     ):
         """
@@ -59,11 +63,15 @@ class Orchestrator:
             base_url: API base URL
             temperature: Model temperature
             worker_roles: Optional custom role->prompt mapping. Merged with defaults.
+            packs: Optional external pack modules loaded for worker resolution.
+            strict_resolution: Whether missing pack/tool/skill issues should stop worker bootstrap.
         """
         self.model = model
         self.api_key = api_key
         self.base_url = base_url
         self.temperature = temperature
+        self.packs = list(packs or [])
+        self.strict_resolution = strict_resolution
         self.kwargs = kwargs
 
         # Build role map: prefer registered skills, fall back to defaults
@@ -71,29 +79,52 @@ class Orchestrator:
         if worker_roles:
             self.roles.update(worker_roles)
 
+    def _log_bootstrap_report(self, role: str, report: BootstrapReport) -> None:
+        """Forward resolver diagnostics to logs for orchestrated workers."""
+
+        for item in report.diagnostics:
+            message = f"[{role}] {item.code}: {item.message}"
+            if item.level == "error":
+                logger.error(message)
+            elif item.level == "warning":
+                logger.warning(message)
+            else:
+                logger.info(message)
+
     def _create_worker(self, role: str, system_prompt: Optional[str] = None) -> MiniAgent:
         """Create a worker agent for a specific role.
         
-        If a Skill is registered for the role, loads it (prompt + tool filter).
-        Otherwise falls back to the role prompt string.
+        If a Skill is registered for the role, resolver applies it as the worker's
+        final capability boundary. Otherwise falls back to the role prompt string.
         """
         prompt = system_prompt or self.roles.get(role, self.roles["coder"])
+        resolved = resolve_runtime(AgentConfig(
+            llm=LLMConfig(temperature=self.temperature),
+            system_prompt=prompt,
+            packs=list(self.packs),
+            default_skill=None if system_prompt else role,
+            strict_resolution=self.strict_resolution,
+        ))
+        self._log_bootstrap_report(role, resolved.report)
+        if resolved.report.has_errors():
+            raise ValueError(
+                "Worker bootstrap failed for role '%s': %s" % (
+                    role,
+                    resolved.report.render_text("developer") or "unknown bootstrap error",
+                )
+            )
+
         agent = MiniAgent(
             model=self.model,
             api_key=self.api_key,
             base_url=self.base_url,
-            temperature=self.temperature,
-            system_prompt=prompt,
+            temperature=resolved.temperature,
+            system_prompt=resolved.system_prompt,
             **self.kwargs,
         )
-        # Load all available tools
-        for tool_name in agent.get_available_tools():
+        for tool_name in resolved.tool_names:
             agent.load_builtin_tool(tool_name)
-        
-        # Apply skill if one is registered for this role (overrides prompt & filters tools)
-        if not system_prompt and get_skill(role):
-            agent.load_skill(role)
-        
+
         return agent
 
     def plan(self, task: str) -> List[Dict[str, str]]:

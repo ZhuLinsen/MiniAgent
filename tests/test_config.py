@@ -1,8 +1,9 @@
 """Tests for config loading."""
 
+import json
 import os
 import pytest
-from miniagent.config import load_config
+from miniagent.config import ProfileConfig, load_config
 
 
 class TestLoadConfig:
@@ -66,3 +67,42 @@ class TestLoadConfig:
             monkeypatch.delenv(key, raising=False)
         config = load_config()
         assert config.llm.api_key is None or config.llm.api_key == ""
+
+    def test_profile_env_override(self, monkeypatch):
+        monkeypatch.setenv("MINIAGENT_PROFILE", "crm_prod")
+        config = load_config()
+        assert config.profile == "crm_prod"
+
+    def test_strict_resolution_env_override(self, monkeypatch):
+        monkeypatch.setenv("STRICT_RESOLUTION", "true")
+        config = load_config()
+        assert config.strict_resolution is True
+
+    def test_load_profiles_and_packs_from_file(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("LLM_API_KEY", "k")
+        config_path = tmp_path / "config.json"
+        config_path.write_text(json.dumps({
+            "packs": ["miniagent_crm_pack"],
+            "profile": "crm_prod",
+            "default_skill": "crm_operator",
+            "strict_resolution": True,
+            "profiles": {
+                "crm_prod": {
+                    "packs": ["miniagent_crm_pack"],
+                    "tools": ["crm_query_customer", "read"],
+                    "skill": "crm_operator",
+                    "system_prompt": "custom profile prompt",
+                    "temperature": 0.2,
+                }
+            }
+        }), encoding="utf-8")
+
+        config = load_config(str(config_path))
+
+        assert config.packs == ["miniagent_crm_pack"]
+        assert config.profile == "crm_prod"
+        assert config.default_skill == "crm_operator"
+        assert config.strict_resolution is True
+        assert isinstance(config.profiles["crm_prod"], ProfileConfig)
+        assert config.profiles["crm_prod"].tools == ["crm_query_customer", "read"]
+        assert config.profiles["crm_prod"].temperature == 0.2

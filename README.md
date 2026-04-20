@@ -233,6 +233,46 @@ register_skill(Skill(
 ))
 ```
 
+## 外挂 Pack 与部署 Profile
+
+业务专属 `tool/skill` 可以继续放在独立 Python 包里，MiniAgent 只负责加载和解析最终启用集，不需要改动内置目录结构。
+
+```python
+# examples/miniagent_demo_pack/pack.py
+PACK_NAME = "demo"
+PACK_VERSION = "0.1.0"
+
+def register():
+    from . import tools, skills
+```
+
+```json
+{
+  "packs": ["examples.miniagent_demo_pack"],
+  "profile": "demo_ops",
+  "profiles": {
+    "default": {
+      "tools": ["read", "write", "edit", "bash", "grep", "glob"],
+      "skill": "coder"
+    },
+    "demo_ops": {
+      "packs": ["examples.miniagent_demo_pack"],
+      "tools": ["read", "grep", "bash", "demo_customer_lookup"],
+      "skill": "demo_operator"
+    }
+  }
+}
+```
+
+CLI 可以显式切换：
+
+```bash
+miniagent --config examples/config_example.json --profile demo_ops
+miniagent --pack examples.miniagent_demo_pack --skill demo_operator --tool demo_customer_lookup
+```
+
+如果系统发生隐式行为，比如 “未显式配置 tools，回退到 skill 白名单” 或 “skill 过滤掉了 profile 请求的 tool”，启动时会直接打印 bootstrap warnings，不会静默处理。
+
 ## 自定义工具
 
 ```python

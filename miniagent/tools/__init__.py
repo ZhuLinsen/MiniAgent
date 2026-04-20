@@ -9,6 +9,7 @@ import inspect
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from ..logger import get_logger
+from ..registration import RegistryMeta, build_registry_meta, registration_scope
 
 logger = get_logger(__name__)
 
@@ -18,7 +19,9 @@ ToolFunction = Callable[..., Any]
 __all__ = [
     'register_tool',
     'get_registered_tools',
+    'get_registered_tool_meta',
     'get_tool',
+    'get_tool_meta',
     'clear_tools',
     'execute_tool',
     'load_tool_from_module',
@@ -30,19 +33,36 @@ __all__ = [
 
 # Dictionary to store registered tools
 _TOOLS: Dict[str, ToolFunction] = {}
+_TOOL_META: Dict[str, RegistryMeta] = {}
 
-def register_tool(func: ToolFunction) -> ToolFunction:
+def register_tool(
+    func: Optional[ToolFunction] = None,
+    *,
+    allow_override: bool = False,
+) -> Union[ToolFunction, Callable[[ToolFunction], ToolFunction]]:
     """
     Decorator to register a function as a tool.
     
     Args:
         func: Function to register as a tool
+        allow_override: Whether to replace an existing tool with the same name
         
     Returns:
-        The registered function
+        The registered function or a decorator wrapper
     """
-    _TOOLS[func.__name__] = func
-    return func
+    def decorator(tool_func: ToolFunction) -> ToolFunction:
+        name = tool_func.__name__
+        if not allow_override and name in _TOOLS:
+            raise ValueError(f"Tool '{name}' is already registered")
+
+        _TOOLS[name] = tool_func
+        _TOOL_META[name] = build_registry_meta(name, module=tool_func.__module__)
+        return tool_func
+
+    if func is None:
+        return decorator
+
+    return decorator(func)
 
 def get_registered_tools() -> Dict[str, ToolFunction]:
     """
@@ -52,6 +72,15 @@ def get_registered_tools() -> Dict[str, ToolFunction]:
         Dictionary of tool name to function mapping
     """
     return _TOOLS
+
+def get_registered_tool_meta() -> Dict[str, RegistryMeta]:
+    """
+    Get metadata for all registered tools.
+    
+    Returns:
+        Dictionary of tool name to registration metadata
+    """
+    return _TOOL_META
 
 def get_tool(name: str) -> Optional[ToolFunction]:
     """
@@ -65,11 +94,24 @@ def get_tool(name: str) -> Optional[ToolFunction]:
     """
     return _TOOLS.get(name)
 
+def get_tool_meta(name: str) -> Optional[RegistryMeta]:
+    """
+    Get registration metadata for a tool by name.
+    
+    Args:
+        name: Name of the tool
+        
+    Returns:
+        Registry metadata or None if not found
+    """
+    return _TOOL_META.get(name)
+
 def clear_tools() -> None:
     """
     Clear all registered tools.
     """
     _TOOLS.clear()
+    _TOOL_META.clear()
 
 def execute_tool(name: str, **kwargs) -> Any:
     """
@@ -235,19 +277,21 @@ def get_tools_description(tools: Optional[List[str]] = None) -> List[Dict[str, A
 
 # Try to import built-in tools, handle import errors gracefully
 try:
-    from .basic_tools import (
-        calculator, get_current_time, system_info, file_stats,
-        disk_usage, process_list, system_load, web_search, http_request,
-        open_browser, open_app, clipboard_copy, clipboard_read,
-        create_docx, env_get, env_set
-    )
+    with registration_scope(source="builtin", pack_name="builtin", module=__name__):
+        from .basic_tools import (
+            calculator, get_current_time, system_info, file_stats,
+            disk_usage, process_list, system_load, web_search, http_request,
+            open_browser, open_app, clipboard_copy, clipboard_read,
+            create_docx, env_get, env_set
+        )
     logger.debug("Imported all tools from basic_tools")
 except ImportError as e:
     logger.warning(f"Failed to import some tools: {e}")
 
 # Code tools (optional import so the package remains robust)
 try:
-    from .code_tools import read, write, edit, glob, grep, bash
+    with registration_scope(source="builtin", pack_name="builtin", module=__name__):
+        from .code_tools import read, write, edit, glob, grep, bash
     logger.debug("Imported all tools from code_tools")
 except ImportError as e:
     logger.warning(f"Failed to import code tools: {e}")
