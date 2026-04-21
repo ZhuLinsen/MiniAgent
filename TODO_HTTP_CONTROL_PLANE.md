@@ -63,7 +63,7 @@ miniagent --control-http 127.0.0.1:8765
 或：
 
 ```bash
-python -m miniagent --config examples/langfuse_security_pack/profile.json --control-http 8765
+python -m miniagent --config langfuse_security_pack/profile.json --control-http 8765
 ```
 
 约定：
@@ -504,7 +504,7 @@ tests/test_control_protocol.py
 
 ```bash
 export MINIAGENT_CONTROL_TOKEN="dev-token"
-python -m miniagent --config examples/langfuse_security_pack/profile.json --control-http 127.0.0.1:8765
+python -m miniagent --config langfuse_security_pack/profile.json --control-http 127.0.0.1:8765
 ```
 
 发送消息：

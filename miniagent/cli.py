@@ -11,7 +11,9 @@ set_cli_mode(True)
 
 import argparse
 import os
-from typing import Any, Dict, List, Optional
+import re
+import threading
+from typing import Any, Callable, Dict, List, Optional
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -22,6 +24,7 @@ from rich.status import Status
 from . import __version__
 from .agent import MiniAgent
 from .config import load_config
+from .control_server import AgentBusyError, ControlPlaneHandle, start_control_server
 from .logger import get_logger
 from .memory import Memory
 from .resolver import RuntimeOverride, resolve_runtime
@@ -42,6 +45,164 @@ def _looks_like_tool_call_stream(partial: str) -> bool:
         "function<|tool_sep|>",
         "function<｜tool▁sep｜>",
     ))
+
+
+def _build_status_event(status_text: str) -> Dict[str, Any]:
+    """Normalize agent status text into a structured event."""
+
+    match = re.search(r"Iteration\s+(\d+)", status_text)
+    if match:
+        return {"type": "assistant.thinking", "iteration": int(match.group(1)), "text": status_text}
+    return {"type": "assistant.status", "text": status_text}
+
+
+class AgentSession:
+    """Shared CLI session state used by both REPL and the HTTP control plane."""
+
+    def __init__(
+        self,
+        agent: MiniAgent,
+        memory: Memory,
+        bootstrap_report: Any,
+        strict_mode: bool,
+        use_streaming: bool,
+        run_mode: str,
+    ):
+        self.agent = agent
+        self.memory = memory
+        self.bootstrap_report = bootstrap_report
+        self.strict_mode = strict_mode
+        self.use_streaming = use_streaming
+        self.run_mode = run_mode
+        self.history: List[Dict[str, str]] = []
+        self.control_http: Optional[str] = None
+        self._state_lock = threading.RLock()
+        self._request_lock = threading.Lock()
+
+    def set_control_http(self, address: str) -> None:
+        """Record the active HTTP control plane address for introspection."""
+
+        with self._state_lock:
+            self.control_http = address
+
+    def clear_history(self) -> None:
+        """Clear the in-memory conversation history."""
+
+        with self._state_lock:
+            self.history.clear()
+
+    def get_history(self, limit: int = 20) -> List[Dict[str, str]]:
+        """Return a copy of recent message history."""
+
+        with self._state_lock:
+            recent = self.history if limit == 0 else self.history[-limit:]
+            return [dict(message) for message in recent]
+
+    def get_session_info(self) -> Dict[str, Any]:
+        """Return lightweight session metadata for the control plane."""
+
+        with self._state_lock:
+            return {
+                "ok": True,
+                "model": self.agent.model,
+                "profile": self.bootstrap_report.selected_profile,
+                "skill": self.bootstrap_report.selected_skill,
+                "tools": [tool["name"] for tool in self.agent.tools],
+                "history_length": len(self.history),
+                "streaming_default": self.use_streaming,
+                "mode": self.run_mode,
+                "control_http": self.control_http,
+            }
+
+    def process_message(
+        self,
+        user_text: str,
+        *,
+        mode: Optional[str] = None,
+        use_streaming: Optional[bool] = None,
+        capture_events: bool = False,
+        event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        tool_callback: Optional[Any] = None,
+        status_callback: Optional[Any] = None,
+        stream_callback: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Execute one user turn and optionally capture structured events."""
+
+        if not self._request_lock.acquire(blocking=False):
+            raise AgentBusyError("MiniAgent session is busy")
+
+        events: Optional[List[Dict[str, Any]]] = [] if capture_events else None
+
+        def _emit_event(event: Dict[str, Any]) -> None:
+            if events is not None:
+                events.append(event)
+            if event_callback is not None:
+                event_callback(event)
+
+        def _tool_callback_proxy(event: str, name: str, payload: Dict[str, Any]) -> None:
+            if event == "start":
+                _emit_event({
+                    "type": "tool.start",
+                    "name": name,
+                    "arguments": payload.get("arguments", {}),
+                })
+            elif event == "end":
+                structured = {"type": "tool.end", "name": name}
+                if "result" in payload:
+                    structured["result"] = payload["result"]
+                if "error" in payload:
+                    structured["error"] = payload["error"]
+                _emit_event(structured)
+
+            if tool_callback:
+                tool_callback(event, name, payload)
+
+        def _status_callback_proxy(status_text: str) -> None:
+            _emit_event(_build_status_event(status_text))
+            if status_callback:
+                status_callback(status_text)
+
+        def _stream_callback_proxy(token: str) -> None:
+            _emit_event({"type": "assistant.delta", "delta": token})
+            if stream_callback:
+                stream_callback(token)
+
+        active_mode = mode or self.run_mode
+        active_streaming = self.use_streaming if use_streaming is None else use_streaming
+
+        with self._state_lock:
+            self.history.append({"role": "user", "content": user_text})
+            self.memory.push("user", user_text)
+            query = _format_history(self.history) + user_text
+
+        try:
+            try:
+                if active_mode == "native":
+                    response = self.agent.run_with_native_tools(
+                        query,
+                        tool_callback=_tool_callback_proxy,
+                        status_callback=_status_callback_proxy,
+                    )
+                else:
+                    response = self.agent.run_with_tools(
+                        query,
+                        tool_callback=_tool_callback_proxy,
+                        status_callback=_status_callback_proxy,
+                        stream_callback=_stream_callback_proxy if active_streaming else None,
+                    )
+            except TypeError:
+                response = self.agent.run(query, mode=active_mode)
+            except Exception:
+                raise
+
+            with self._state_lock:
+                self.history.append({"role": "assistant", "content": response})
+                self.memory.push("assistant", response)
+
+            _emit_event({"type": "assistant.final", "content": response})
+            return {"content": response, "events": events or []}
+        finally:
+            self._request_lock.release()
 
 def _format_history(history: List[Dict[str, str]], limit_turns: int = 10) -> str:
     if not history:
@@ -247,6 +408,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--skill", help="Override the active skill")
     parser.add_argument("--pack", action="append", help="Add an external pack module")
     parser.add_argument("--tool", action="append", help="Explicitly enable a tool")
+    parser.add_argument("--control-http", help="Enable the local HTTP control plane on [HOST:]PORT")
     parser.add_argument("--strict-resolution", action="store_true", help="Fail startup when bootstrap diagnostics contain errors")
     args = parser.parse_args(argv)
 
@@ -280,145 +442,141 @@ def main(argv: Optional[List[str]] = None) -> int:
         title = "Bootstrap Warnings" if bootstrap_report.diagnostics else "Bootstrap"
         console.print(Panel(report_text, title=title, border_style=border))
     
-    # Streaming flag — can be toggled with /stream
-    use_streaming = os.environ.get("MINIAGENT_STREAM", "1") != "0"
-    # Tool calling mode — "text" (default) or "native"
-    run_mode = "text"
+    session = AgentSession(
+        agent=agent,
+        memory=memory,
+        bootstrap_report=bootstrap_report,
+        strict_mode=strict_mode,
+        use_streaming=os.environ.get("MINIAGENT_STREAM", "1") != "0",
+        run_mode="text",
+    )
 
-    history: List[Dict[str, str]] = []
-
-    while True:
+    control_handle: Optional[ControlPlaneHandle] = None
+    if args.control_http:
         try:
-            user_text = Prompt.ask("[cyan]you[/cyan]")
-            user_text = user_text.strip()
-        except (EOFError, KeyboardInterrupt):
-            console.print()
-            break
-
-        if not user_text:
-            continue
-
-        if user_text in ("/q", "/quit", "/exit"):
-            break
-        if user_text in ("/c", "/clear"):
-            history.clear()
-            console.print(f"[dim]cleared[/dim]")
-            continue
-        if user_text == "/stream":
-            use_streaming = not use_streaming
-            console.print(f"[dim]streaming {'on' if use_streaming else 'off'}[/dim]")
-            continue
-        if user_text == "/model":
-            console.print(f"[dim]current model:[/dim] {agent.model}")
-            try:
-                new_model = Prompt.ask("[dim]new model (enter to keep)[/dim]", default=agent.model)
-                if new_model != agent.model:
-                    agent.model = new_model
-                    console.print(f"[green]✓[/green] switched to {new_model}")
-            except (EOFError, KeyboardInterrupt):
-                pass
-            continue
-        if user_text == "/mode":
-            run_mode = "native" if run_mode == "text" else "text"
-            console.print(f"[dim]mode: {run_mode}[/dim]")
-            continue
-        if user_text in ("/help", "help"):
-            console.print("[bold]Commands:[/bold]")
-            console.print("  /help    show this help")
-            console.print("  /bootstrap  show startup profile/skill/tool diagnostics")
-            console.print("  /c       clear conversation history")
-            console.print("  /stream  toggle streaming output")
-            console.print("  /model   switch LLM model")
-            console.print("  /mode    toggle text/native FC mode")
-            console.print("  /tools   list loaded tools")
-            console.print("  /q       quit")
-            console.print(
-                f"\n[dim]model: {agent.model} | mode: {run_mode} | streaming: {'on' if use_streaming else 'off'} | "
-                f"strict: {'on' if strict_mode else 'off'} | tools: {len(agent.tools)}[/dim]"
-            )
-            continue
-        if user_text == "/bootstrap":
-            console.print(Panel(
-                bootstrap_report.render_text("user") or "No bootstrap diagnostics.",
-                title="Bootstrap",
-                border_style="blue",
-            ))
-            continue
-        if user_text == "/tools":
-            console.print(f"[bold]Loaded Tools ({len(agent.tools)}):[/bold]")
-            for t in agent.tools:
-                desc = t['description'].split('\n')[0][:70]
-                console.print(f"  [cyan]{t['name']:<18}[/cyan] {desc}")
-            continue
-
-        history.append({"role": "user", "content": user_text})
-        memory.push("user", user_text)
-
-        query = _format_history(history) + user_text
-        
-        # Prepare streaming callback
-        _stream_chunks: List[str] = []
-        _stream_has_tool_call = False
-        
-        def _stream_callback(token: str) -> None:
-            """Print streaming tokens, but suppress if it's a tool call block."""
-            nonlocal _stream_has_tool_call, _stream_chunks
-            _stream_chunks.append(token)
-            # Detect tool call patterns early and stop printing
-            partial = "".join(_stream_chunks)
-            if _looks_like_tool_call_stream(partial):
-                _stream_has_tool_call = True
-                return
-            if not _stream_has_tool_call:
-                console.print(token, end="", highlight=False)
-
-        try:
-            # Show thinking indicator
-            with console.status("[dim]Thinking...[/dim]", spinner="dots") as status:
-                global _current_status
-                _current_status = status
-                try:
-                    if run_mode == "native":
-                        response = agent.run_with_native_tools(
-                            query,
-                            tool_callback=_tool_callback,
-                            status_callback=_status_callback,
-                        )
-                    else:
-                        response = agent.run_with_tools(
-                            query, 
-                            tool_callback=_tool_callback,
-                            status_callback=_status_callback,
-                            stream_callback=_stream_callback if use_streaming else None,
-                        )
-                finally:
-                    _current_status = None
-        except TypeError:
-            # Backward compatibility if tool_callback not available.
-            response = agent.run(query, mode=run_mode)
+            control_handle = start_control_server(session, args.control_http)
         except Exception as e:
-            console.print(f"[red]error:[/red] {type(e).__name__}: {str(e)[:200]}")
-            continue
+            console.print(f"[red]error:[/red] failed to start control-http: {e}")
+            return 1
+        session.set_control_http(control_handle.address)
+        console.print(f"[dim]control-http:[/dim] {control_handle.address}")
 
-        history.append({"role": "assistant", "content": response})
-        memory.push("assistant", response)
+    try:
+        while True:
+            try:
+                user_text = Prompt.ask("[cyan]you[/cyan]")
+                user_text = user_text.strip()
+            except (EOFError, KeyboardInterrupt):
+                console.print()
+                break
 
-        # If streaming printed the final answer already, just add a newline
-        if use_streaming and _stream_chunks and not _stream_has_tool_call:
-            console.print()  # newline after streamed output
-            continue
+            if not user_text:
+                continue
 
-        # Truncate overly long responses for display (keep full in history)
-        display_response = response
-        if len(response) > 2000:
-            # Count lines and truncate if too long
-            lines = response.split('\n')
-            if len(lines) > 50:
-                display_response = '\n'.join(lines[:20]) + f'\n\n... ({len(lines) - 40} lines omitted) ...\n\n' + '\n'.join(lines[-20:])
-            else:
-                display_response = response[:1000] + f'\n\n... ({len(response) - 2000} chars omitted) ...\n\n' + response[-1000:]
-        
-        console.print(Panel(Markdown(display_response), title="assistant", style="green", border_style="green"))
+            if user_text in ("/q", "/quit", "/exit"):
+                break
+            if user_text in ("/c", "/clear"):
+                session.clear_history()
+                console.print(f"[dim]cleared[/dim]")
+                continue
+            if user_text == "/stream":
+                session.use_streaming = not session.use_streaming
+                console.print(f"[dim]streaming {'on' if session.use_streaming else 'off'}[/dim]")
+                continue
+            if user_text == "/model":
+                console.print(f"[dim]current model:[/dim] {agent.model}")
+                try:
+                    new_model = Prompt.ask("[dim]new model (enter to keep)[/dim]", default=agent.model)
+                    if new_model != agent.model:
+                        agent.model = new_model
+                        console.print(f"[green]✓[/green] switched to {new_model}")
+                except (EOFError, KeyboardInterrupt):
+                    pass
+                continue
+            if user_text == "/mode":
+                session.run_mode = "native" if session.run_mode == "text" else "text"
+                console.print(f"[dim]mode: {session.run_mode}[/dim]")
+                continue
+            if user_text in ("/help", "help"):
+                console.print("[bold]Commands:[/bold]")
+                console.print("  /help    show this help")
+                console.print("  /bootstrap  show startup profile/skill/tool diagnostics")
+                console.print("  /c       clear conversation history")
+                console.print("  /stream  toggle streaming output")
+                console.print("  /model   switch LLM model")
+                console.print("  /mode    toggle text/native FC mode")
+                console.print("  /tools   list loaded tools")
+                console.print("  /q       quit")
+                console.print(
+                    f"\n[dim]model: {agent.model} | mode: {session.run_mode} | streaming: {'on' if session.use_streaming else 'off'} | "
+                    f"strict: {'on' if strict_mode else 'off'} | tools: {len(agent.tools)}[/dim]"
+                )
+                continue
+            if user_text == "/bootstrap":
+                console.print(Panel(
+                    bootstrap_report.render_text("user") or "No bootstrap diagnostics.",
+                    title="Bootstrap",
+                    border_style="blue",
+                ))
+                continue
+            if user_text == "/tools":
+                console.print(f"[bold]Loaded Tools ({len(agent.tools)}):[/bold]")
+                for t in agent.tools:
+                    desc = t['description'].split('\n')[0][:70]
+                    console.print(f"  [cyan]{t['name']:<18}[/cyan] {desc}")
+                continue
+
+            # Prepare streaming callback
+            _stream_chunks: List[str] = []
+            _stream_has_tool_call = False
+
+            def _stream_callback(token: str) -> None:
+                """Print streaming tokens, but suppress if it's a tool call block."""
+                nonlocal _stream_has_tool_call, _stream_chunks
+                _stream_chunks.append(token)
+                partial = "".join(_stream_chunks)
+                if _looks_like_tool_call_stream(partial):
+                    _stream_has_tool_call = True
+                    return
+                if not _stream_has_tool_call:
+                    console.print(token, end="", highlight=False)
+
+            try:
+                with console.status("[dim]Thinking...[/dim]", spinner="dots") as status:
+                    global _current_status
+                    _current_status = status
+                    try:
+                        result = session.process_message(
+                            user_text,
+                            mode=session.run_mode,
+                            use_streaming=session.use_streaming,
+                            tool_callback=_tool_callback,
+                            status_callback=_status_callback,
+                            stream_callback=_stream_callback if session.use_streaming else None,
+                        )
+                        response = result["content"]
+                    finally:
+                        _current_status = None
+            except Exception as e:
+                console.print(f"[red]error:[/red] {type(e).__name__}: {str(e)[:200]}")
+                continue
+
+            if session.use_streaming and _stream_chunks and not _stream_has_tool_call:
+                console.print()
+                continue
+
+            display_response = response
+            if len(response) > 2000:
+                lines = response.split('\n')
+                if len(lines) > 50:
+                    display_response = '\n'.join(lines[:20]) + f'\n\n... ({len(lines) - 40} lines omitted) ...\n\n' + '\n'.join(lines[-20:])
+                else:
+                    display_response = response[:1000] + f'\n\n... ({len(response) - 2000} chars omitted) ...\n\n' + response[-1000:]
+
+            console.print(Panel(Markdown(display_response), title="assistant", style="green", border_style="green"))
+    finally:
+        if control_handle:
+            control_handle.close()
 
     return 0
 

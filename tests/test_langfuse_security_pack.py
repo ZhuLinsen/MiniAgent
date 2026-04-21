@@ -1,6 +1,6 @@
 """Tests for the Langfuse security example pack."""
 
-from examples.langfuse_security_pack.tools import _redact_text
+from langfuse_security_pack.tools import _redact_text
 
 
 def test_redact_text_handles_prefixed_and_standalone_secrets():

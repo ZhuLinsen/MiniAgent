@@ -90,6 +90,133 @@ miniagent          # 或 python -m miniagent
 
 </details>
 
+## 命令行交互方式
+
+MiniAgent 现在支持 3 种常用交互方式，适合人类直接使用，也适合脚本或机器人接入。
+
+### 1. 交互式 REPL
+
+最常见的用法就是直接进入 CLI 会话：
+
+```bash
+miniagent
+# 或
+python -m miniagent
+```
+
+常见启动参数：
+
+```bash
+python -m miniagent --config examples/config_example.json
+python -m miniagent --config examples/config_example.json --profile demo_ops
+python -m miniagent --pack examples.miniagent_demo_pack --skill demo_operator --tool demo_customer_lookup
+python -m miniagent --model deepseek-chat --api-key <your-key> --base-url https://api.deepseek.com/v1
+```
+
+进入会话后，直接像聊天一样输入：
+
+```text
+you: compute 2+42
+you: 帮我读取 README.md 前 50 行
+you: 搜索项目里所有 TODO
+```
+
+内置常用命令：
+
+```text
+/help        显示帮助
+/bootstrap   查看当前 profile/skill/tool 解析结果
+/tools       查看当前已加载工具
+/stream      切换流式输出
+/mode        切换 text / native function calling
+/model       临时切换模型
+/clear       清空当前对话历史
+/exit        退出
+```
+
+### 2. 命令行脚本化交互
+
+如果你想在 shell 脚本里驱动 MiniAgent，可以直接通过标准输入喂命令：
+
+```bash
+printf 'compute 2+42\n/exit\n' | python -m miniagent --tool calculator --api-key <your-key> --model deepseek-chat
+```
+
+也可以用 Here-doc：
+
+```bash
+python -m miniagent --config examples/config_example.json <<'EOF'
+帮我读取 README.md 前 20 行
+/tools
+/exit
+EOF
+```
+
+这种方式适合：
+
+- 本地 shell 自动化
+- CI smoke test
+- 用脚本批量验证某个 tool / profile 是否能启动
+
+### 3. HTTP 控制面
+
+如果你希望让外部机器人、测试器或自动化脚本稳定控制当前 MiniAgent 进程，可以开启 HTTP 控制面：
+
+```bash
+python -m miniagent --config langfuse_security_pack/profile.json --control-http 127.0.0.1:8765
+```
+
+可用接口：
+
+```text
+GET  /healthz
+GET  /v1/session
+GET  /v1/history?limit=20
+POST /v1/message
+POST /v1/interrupt   # 当前仅占位，未实现中断
+```
+
+非流式调用示例：
+
+```bash
+curl \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"compute 2+42","stream":false,"mode":"text"}' \
+  http://127.0.0.1:8765/v1/message
+```
+
+流式 NDJSON 调用示例：
+
+```bash
+curl -N \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"compute 2+42","stream":true,"mode":"text","request_id":"req-1"}' \
+  http://127.0.0.1:8765/v1/message
+```
+
+流式返回会按行输出事件，例如：
+
+```json
+{"type":"request.accepted","request_id":"req-1"}
+{"type":"assistant.thinking","iteration":1}
+{"type":"tool.start","name":"calculator","arguments":{"expression":"2 + 42"}}
+{"type":"tool.end","name":"calculator","result":{"expression":"2 + 42","result":44}}
+{"type":"assistant.final","content":"The result is 44."}
+{"type":"request.complete","ok":true,"request_id":"req-1"}
+```
+
+如果你设置了：
+
+```bash
+export MINIAGENT_CONTROL_TOKEN=your-token
+```
+
+请求时需要带：
+
+```bash
+-H 'Authorization: Bearer your-token'
+```
+
 ## 使用示例
 
 ```
@@ -236,6 +363,9 @@ register_skill(Skill(
 ## 外挂 Pack 与部署 Profile
 
 业务专属 `tool/skill` 可以继续放在独立 Python 包里，MiniAgent 只负责加载和解析最终启用集，不需要改动内置目录结构。
+
+如果是你本地业务专用的 pack，建议直接放在仓库根目录的 `*_pack/` 文件夹中，例如 `langfuse_security_pack/`。
+这类目录默认可以通过 `.gitignore` 忽略，避免在提交 MiniAgent 架构代码时把具体业务 pack 一起上传。
 
 ```python
 # examples/miniagent_demo_pack/pack.py
