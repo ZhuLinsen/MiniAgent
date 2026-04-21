@@ -117,7 +117,7 @@ If the question is outside the scope of the available tools, use your knowledge 
         self.confirm_callback = confirm_callback
         
         # Cache config limits (read env vars once, not per-request)
-        self._max_context_messages = int(os.environ.get("MAX_CONTEXT_MESSAGES", "20"))
+        self._max_context_messages = int(os.environ.get("MAX_CONTEXT_MESSAGES", "40"))
         self._tool_result_limit = int(os.environ.get("TOOL_RESULT_LIMIT", "16000"))
         
         # Initialize the LLM client
@@ -432,10 +432,15 @@ If the question is outside the scope of the available tools, use your knowledge 
         """
         logger.debug(f"Parsing tool call from content (length={len(content)})")
 
-        # Two clean patterns: strict and relaxed
+        # Supported text-mode tool call shapes:
+        # 1. TOOL: <name> ARGS: {...}
+        # 2. Tool/工具: <name> Args/参数: {...}
+        # 3. Chat-template special tokens such as
+        #    <｜tool▁call▁begin｜>function<｜tool▁sep｜>calculator
         tool_name_patterns = [
             r"TOOL:\s*(\w+)\s*ARGS:\s*",
             r"(?:Tool|工具|USE TOOL|使用工具|工具名称|TOL):\s*(\w+)\s*(?:ARGS|Args|参数|WITH ARGS|工具参数|Arguments):\s*",
+            r"(?:<\|tool_call_begin\|>|<｜tool▁call▁begin｜>)\s*function\s*(?:<\|tool_sep\|>|<｜tool▁sep｜>)\s*(\w+)\s*",
         ]
 
         for pattern in tool_name_patterns:
@@ -871,7 +876,37 @@ If the question is outside the scope of the available tools, use your knowledge 
             msg = response.choices[0].message
             
             if not msg.tool_calls:
-                return msg.content or ""
+                content = msg.content or ""
+                tool_call = self._parse_tool_call(content)
+                if not tool_call:
+                    return content
+
+                messages.append({"role": "assistant", "content": content})
+                result_str, rejected = self._safe_execute_tool(
+                    tool_call, tool_callback, status_callback, limit
+                )
+
+                if rejected:
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            f"Tool execution of '{tool_call['name']}' was rejected by user. "
+                            "Please suggest a safer alternative."
+                        ),
+                    })
+                else:
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            f"Tool execution result: {tool_call['name']} returned: {result_str}\n"
+                            "Continue answering the user's question, or call another tool if needed."
+                        ),
+                    })
+                    iteration += 1
+                    continue
+
+                iteration += 1
+                continue
             
             messages.append(msg)
             

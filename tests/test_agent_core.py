@@ -214,3 +214,58 @@ def test_native_tools_fall_back_to_text_mode_for_direct_endpoint():
 
     assert result == "fallback response"
     agent.run_with_tools.assert_called_once()
+
+
+def test_run_with_tools_executes_builtin_calculator():
+    """Text-mode tool loop should execute the built-in calculator tool."""
+    with patch("miniagent.agent.MiniAgent._init_llm_client"):
+        agent = MiniAgent(model="test-model", api_key="fake-key")
+
+    assert agent.load_builtin_tool("calculator") is True
+
+    calculator_spy = Mock(wraps=agent.tools[0]["executor"])
+    agent.tools[0]["executor"] = calculator_spy
+    agent._call_llm = Mock(side_effect=[
+        'TOOL: calculator\nARGS: {"expression": "2 + 3 * 4"}',
+        "The result is 14.",
+    ])
+
+    result = agent.run_with_tools("What is 2 + 3 * 4?")
+    assert result == "The result is 14."
+    calculator_spy.assert_called_once_with(expression="2 + 3 * 4")
+
+    second_call_messages = agent._call_llm.call_args_list[1].args[0]
+    tool_result_message = next(
+        msg["content"]
+        for msg in second_call_messages
+        if msg["role"] == "user" and "Tool execution result: calculator returned:" in msg["content"]
+    )
+    assert "Tool execution result: calculator returned:" in tool_result_message
+    assert "'expression': '2 + 3 * 4'" in tool_result_message
+    assert "'result': 14" in tool_result_message
+
+
+def test_run_with_tools_executes_calculator_from_special_token_format():
+    """Text-mode tool loop should execute calculator when the model emits chat-template tool tokens."""
+    with patch("miniagent.agent.MiniAgent._init_llm_client"):
+        agent = MiniAgent(model="test-model", api_key="fake-key")
+
+    assert agent.load_builtin_tool("calculator") is True
+
+    calculator_spy = Mock(wraps=agent.tools[0]["executor"])
+    agent.tools[0]["executor"] = calculator_spy
+    agent._call_llm = Mock(side_effect=[
+        (
+            "I'll compute that using the calculator tool:"
+            "<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>calculator\n"
+            "```json\n"
+            "{\"expression\": \"2 + 42\"}\n"
+            "```"
+        ),
+        "The result is 44.",
+    ])
+
+    result = agent.run_with_tools("compute 2+42")
+
+    assert result == "The result is 44."
+    calculator_spy.assert_called_once_with(expression="2 + 42")

@@ -12,3 +12,9 @@ def test_main_strict_resolution_flag_exits_on_bootstrap_errors(_mock_init, monke
     exit_code = cli.main(["--api-key", "fake-key", "--strict-resolution"])
 
     assert exit_code == 1
+
+
+def test_stream_tool_detection_handles_special_tool_tokens():
+    assert cli._looks_like_tool_call_stream(
+        "I'll compute that<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>calculator"
+    ) is True

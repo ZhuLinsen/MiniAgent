@@ -680,3 +680,63 @@ def env_set(name: str, value: str) -> str:
         return "[blocked] Cannot modify sensitive environment variables"
     os.environ[name] = value
     return f"Set environment variable: {name}={value}"
+
+import csv
+import json
+from typing import Optional
+
+@register_tool
+def read_csv_file(file_path: str, encoding: str = "utf-8", preview_rows: int = 20) -> str:
+    """
+    读取 CSV 文件并返回结构化信息（JSON 字符串），适用于 Agent 工具调用。
+
+    参数:
+        file_path (str): CSV 文件的路径。
+        encoding (str): 文件编码，默认 utf-8。
+        preview_rows (int): 返回的数据预览行数（不含表头），默认 20。
+
+    返回:
+        str: JSON 字符串，包含以下字段：
+            - success (bool): 是否成功读取。
+            - message (str): 附加信息（如错误原因）。
+            - total_rows (int): 文件总数据行数（不含表头）。
+            - columns (list): 列名列表。
+            - preview (list): 前 preview_rows 行数据（每行为字典）。
+    """
+    result = {
+        "success": False,
+        "message": "",
+        "total_rows": 0,
+        "columns": [],
+        "preview": []
+    }
+
+    try:
+        with open(file_path, mode='r', encoding=encoding, newline='') as f:
+            # 使用 DictReader 自动处理表头
+            reader = csv.DictReader(f)
+            if reader.fieldnames is None:
+                result["message"] = "CSV 文件没有列头或为空"
+                return json.dumps(result, ensure_ascii=False)
+
+            result["columns"] = reader.fieldnames
+            data_rows = []
+            total = 0
+            for i, row in enumerate(reader):
+                total += 1
+                if i < preview_rows:
+                    data_rows.append(row)
+            result["total_rows"] = total
+            result["preview"] = data_rows
+            result["success"] = True
+            result["message"] = f"成功读取 {total} 行数据，预览前 {len(data_rows)} 行"
+    except FileNotFoundError:
+        result["message"] = f"文件不存在: {file_path}"
+    except PermissionError:
+        result["message"] = f"无权限读取文件: {file_path}"
+    except UnicodeDecodeError:
+        result["message"] = f"编码错误，请尝试其他编码（如 'gbk'），当前编码: {encoding}"
+    except Exception as e:
+        result["message"] = f"读取 CSV 文件时发生未知错误: {str(e)}"
+
+    return json.dumps(result, ensure_ascii=False, indent=2)

@@ -30,6 +30,19 @@ logger = get_logger(__name__)
 
 console = Console()
 
+
+def _looks_like_tool_call_stream(partial: str) -> bool:
+    """Best-effort detection for streamed tool-call text that should be suppressed."""
+    return any(marker in partial for marker in (
+        "TOOL:",
+        "Tool:",
+        "工具:",
+        "<|tool",
+        "<｜tool",
+        "function<|tool_sep|>",
+        "function<｜tool▁sep｜>",
+    ))
+
 def _format_history(history: List[Dict[str, str]], limit_turns: int = 10) -> str:
     if not history:
         return ""
@@ -353,7 +366,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             _stream_chunks.append(token)
             # Detect tool call patterns early and stop printing
             partial = "".join(_stream_chunks)
-            if "TOOL:" in partial or "Tool:" in partial or "工具:" in partial:
+            if _looks_like_tool_call_stream(partial):
                 _stream_has_tool_call = True
                 return
             if not _stream_has_tool_call:

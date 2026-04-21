@@ -57,6 +57,19 @@ ARGS: {
         assert result is not None
         assert result["name"] == "write"
 
+    def test_special_tool_token_format(self, agent):
+        content = (
+            "I'll compute that using the calculator tool:"
+            "<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>calculator\n"
+            "```json\n"
+            "{\"expression\": \"2 + 42\"}\n"
+            "```"
+        )
+        result = agent._parse_tool_call(content)
+        assert result is not None
+        assert result["name"] == "calculator"
+        assert result["arguments"]["expression"] == "2 + 42"
+
 
 class TestExtractBalancedJson:
     def test_simple(self, agent):
