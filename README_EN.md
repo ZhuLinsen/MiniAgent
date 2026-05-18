@@ -19,7 +19,7 @@ MiniAgent is a **minimalist, transparent, and powerful CLI Agent framework** —
 - 🧠 **Code Agent**: Write code, fix bugs, and run tests like Claude Code
 - 🦾 **OS Agent**: Control browsers, edit documents, and manage apps like Manus
 - ⚡ **Minimalist**: Core engine `agent.py` is fully transparent and hackable
-- 🤖 **Model Agnostic**: DeepSeek, OpenAI, Claude, and any OpenAI-compatible models
+- 🤖 **Model Agnostic**: DeepSeek, OpenAI, Gemini, Claude, and any OpenAI-compatible models
 - 🔌 **Extensible**: Simple decorator pattern — add custom tools in 3 lines of code
 - 🔄 **Dual Tool Calling**: Text parsing mode (transparent, educational) + Native Function Calling (reliable)
 - 🎯 **Skill System**: Reusable Agent configs with built-in coder/researcher/reviewer/tester roles
@@ -80,6 +80,14 @@ Create a `.env` file (see `.env.example` for all options):
 LLM_API_KEY=your_api_key_here
 LLM_MODEL=deepseek-chat
 LLM_API_BASE=https://api.deepseek.com/v1
+```
+
+Gemini works through Google's OpenAI-compatible endpoint:
+
+```bash
+GEMINI_API_KEY=your_gemini_api_key
+LLM_MODEL=gemini-2.5-flash
+LLM_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai/
 ```
 
 ### Run
