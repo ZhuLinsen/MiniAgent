@@ -19,7 +19,7 @@ MiniAgent 是一个**极简、透明、强大的 CLI Agent 框架**，拒绝臃�
 - 🧠 **Code Agent**: 像 Claude Code 一样写代码、修 Bug、跑测试
 - 🦾 **OS Agent**: 像 Manus 一样操控浏览器、编辑文档、管理应用
 - ⚡ **极简实现**: 核心引擎 `agent.py` 完全透明可控，适合学习和魔改
-- 🤖 **全模型支持**: DeepSeek、OpenAI、Claude 等所有兼容 OpenAI 接口的模型
+- 🤖 **全模型支持**: DeepSeek、OpenAI、Gemini、Claude 等所有兼容 OpenAI 接口的模型
 - 🔌 **高扩展性**: 极简装饰器模式，3行代码即可挂载自定义工具
 - 🔄 **双模式工具调用**: 文本解析模式（透明可学习）+ 原生 Function Calling 模式（更可靠）
 - 🎯 **Skill 系统**: 可复用的 Agent 配置，内置 coder/researcher/reviewer/tester 四个角色
@@ -80,6 +80,14 @@ pip install -e .  # 安装 miniagent 命令
 LLM_API_KEY=your_api_key_here
 LLM_MODEL=deepseek-chat
 LLM_API_BASE=https://api.deepseek.com/v1
+```
+
+Gemini 可使用 Google 的 OpenAI 兼容接口：
+
+```bash
+GEMINI_API_KEY=your_gemini_api_key
+LLM_MODEL=gemini-2.5-flash
+LLM_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai/
 ```
 
 ### 运行

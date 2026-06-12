@@ -66,11 +66,14 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
     config = AgentConfig()
     
     # Try to get API key from environment variables with multiple fallbacks
-    # Priority order: LLM_API_KEY > OPENAI_API_KEY > DEEPSEEK_API_KEY > ANTHROPIC_API_KEY > AZURE_OPENAI_API_KEY
+    # Priority order: LLM_API_KEY > OPENAI_API_KEY > DEEPSEEK_API_KEY > GEMINI_API_KEY
+    # > GOOGLE_API_KEY > ANTHROPIC_API_KEY > AZURE_OPENAI_API_KEY
     env_api_key = (
         os.environ.get("LLM_API_KEY") or 
         os.environ.get("OPENAI_API_KEY") or 
         os.environ.get("DEEPSEEK_API_KEY") or 
+        os.environ.get("GEMINI_API_KEY") or
+        os.environ.get("GOOGLE_API_KEY") or
         os.environ.get("ANTHROPIC_API_KEY") or 
         os.environ.get("AZURE_OPENAI_API_KEY")
     )
@@ -128,6 +131,8 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
         api_base_lower = config.llm.api_base.lower()
         if "deepseek" in api_base_lower and not env_model:
             config.llm.model = "deepseek-chat"
+        elif ("generativelanguage.googleapis.com" in api_base_lower or "gemini" in api_base_lower) and not env_model:
+            config.llm.model = "gemini-2.5-flash"
         elif "anthropic" in api_base_lower and not env_model:
             config.llm.model = "claude-3-sonnet-20240229"
         elif "azure" in api_base_lower and not env_model:
@@ -159,4 +164,4 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
     except Exception as e:
         logger.error(f"Failed to load configuration from {config_path}: {e}")
         
-    return config 
+    return config

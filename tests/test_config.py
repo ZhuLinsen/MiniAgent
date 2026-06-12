@@ -24,6 +24,23 @@ class TestLoadConfig:
         config = load_config()
         assert config.llm.api_key == "openai-fallback-key"
 
+    def test_gemini_api_key_fallback(self, monkeypatch):
+        """Gemini provider keys should work without copying them to LLM_API_KEY."""
+        for key in ("LLM_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY"):
+            monkeypatch.delenv(key, raising=False)
+        monkeypatch.setenv("GEMINI_API_KEY", "gemini-fallback-key")
+
+        config = load_config()
+        assert config.llm.api_key == "gemini-fallback-key"
+
+    def test_google_api_base_sets_default_model(self, monkeypatch):
+        monkeypatch.delenv("LLM_MODEL", raising=False)
+        monkeypatch.setenv("LLM_API_KEY", "k")
+        monkeypatch.setenv("LLM_API_BASE", "https://generativelanguage.googleapis.com/v1beta/openai/")
+
+        config = load_config()
+        assert config.llm.model == "gemini-2.5-flash"
+
     def test_default_values(self, monkeypatch):
         """With minimal env, config should still load with defaults."""
         monkeypatch.setenv("LLM_API_KEY", "k")
@@ -62,7 +79,15 @@ class TestLoadConfig:
 
     def test_no_api_key_at_all(self, monkeypatch):
         """Config should still load when no API key is set."""
-        for key in ("LLM_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY"):
+        for key in (
+            "LLM_API_KEY",
+            "OPENAI_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "AZURE_OPENAI_API_KEY",
+        ):
             monkeypatch.delenv(key, raising=False)
         config = load_config()
         assert config.llm.api_key is None or config.llm.api_key == ""
