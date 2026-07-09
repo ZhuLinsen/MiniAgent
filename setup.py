@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from setuptools import setup, find_packages
 from pathlib import Path
+
+from setuptools import find_packages, setup
 
 # Read README with explicit UTF-8 encoding (fixes Windows GBK error)
 readme_path = Path(__file__).parent / "README.md"
@@ -21,6 +22,10 @@ setup(
         "distro>=1.8.0",
         "rich>=13.0.0",
     ],
+    extras_require={
+        "docx": ["python-docx>=0.8.11"],
+        "dev": ["pytest>=8.0.0,<9"],
+    },
     author="MiniAgent Team",
     author_email="miniagent@example.com",
     description="A minimalist CLI Agent framework — the best textbook for understanding AI Agents",
@@ -58,4 +63,4 @@ setup(
             "miniagent=miniagent.cli:main",
         ]
     },
-) 
+)

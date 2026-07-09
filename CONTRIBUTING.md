@@ -18,26 +18,33 @@ git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
 ```
 
-2. 创建并激活虚拟环境（推荐）：
+2. 安装依赖（推荐 uv）：
 
 ```bash
-python -m venv venv
-# 在Windows上
-venv\Scripts\activate
-# 在Linux/macOS上
-source venv/bin/activate
+uv sync
 ```
 
-3. 安装开发依赖：
+也可以继续使用 pip：
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+pip install -e .
 ```
 
-4. 本地安装包（开发模式）：
+3. 启动 CLI：
 
 ```bash
-pip install -e .
+uv run miniagent
+# 如果使用 pip 安装，也可以直接运行：miniagent
+```
+
+4. 安装可选的 Word 文档依赖：
+
+```bash
+uv sync --extra docx
+# 或 pip install python-docx
 ```
 
 ## 开发规范
@@ -98,7 +105,8 @@ LLM_API_KEY=your_api_key_here
 运行测试：
 
 ```bash
-python -m pytest tests/ -v
+uv run pytest tests/ -v
+# 如果使用 pip 安装：python -m pytest tests/ -v
 ```
 
 核心逻辑改动需附带测试用例。

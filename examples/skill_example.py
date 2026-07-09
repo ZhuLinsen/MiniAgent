@@ -8,8 +8,9 @@ Skills bundle a system prompt + tool whitelist + parameters into a reusable conf
 MiniAgent ships 4 built-in skills: coder, researcher, reviewer, tester.
 
 Usage:
-    pip install -e .  # install MiniAgent first
-    python examples/skill_example.py
+    uv sync  # install MiniAgent first
+    # or: pip install -e .
+    uv run python examples/skill_example.py
 """
 
 from miniagent import MiniAgent, Skill, register_skill, get_skill, list_skills

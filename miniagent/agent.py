@@ -139,7 +139,7 @@ If the question is outside the scope of the available tools, use your knowledge 
             )
             logger.info(f"LLM client initialized: model={self.model}, base_url={self.base_url or 'default'}")
         except ImportError:
-            logger.error("OpenAI package not installed. Please install it with 'pip install openai'")
+            logger.error("OpenAI package not installed. Please run 'uv sync' or 'pip install -r requirements.txt'")
             raise
         except Exception as e:
             logger.error(f"Failed to initialize LLM client: {e}")

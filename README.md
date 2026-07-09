@@ -55,9 +55,9 @@ MiniAgent 是一个**极简、透明、强大的 CLI Agent 框架**，拒绝臃�
 
 ```bash
 git clone https://github.com/ZhuLinsen/MiniAgent.git && cd MiniAgent
-pip install -r requirements.txt && pip install -e .
+uv sync
 cp .env.example .env  # 填入你的 API Key
-miniagent              # 启动！
+uv run miniagent       # 启动！
 ```
 
 <details>
@@ -65,11 +65,21 @@ miniagent              # 启动！
 
 ### 安装
 
+推荐使用 uv：
+
 ```bash
 git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
+uv sync
+```
+
+也可以继续使用 pip：
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-pip install -e .  # 安装 miniagent 命令
+pip install -e .
 ```
 
 ### 配置
@@ -93,7 +103,20 @@ LLM_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai/
 ### 运行
 
 ```bash
+uv run miniagent          # 或 uv run python -m miniagent
+```
+
+如果使用 pip 安装：
+
+```bash
 miniagent          # 或 python -m miniagent
+```
+
+安装可选的 Word 文档依赖：
+
+```bash
+uv sync --extra docx
+# 或 pip install python-docx
 ```
 
 </details>
