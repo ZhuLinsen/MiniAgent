@@ -58,6 +58,9 @@ miniagent = "miniagent.cli:main"
 docx = [
     "python-docx>=0.8.11",
 ]
+dev = [
+    "pytest>=8.0.0,<9",
+]
 
 [dependency-groups]
 dev = [
