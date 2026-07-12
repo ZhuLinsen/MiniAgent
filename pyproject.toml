@@ -1,0 +1,78 @@
+[project]
+name = "miniagent"
+version = "0.1.0"
+description = "A minimalist CLI Agent framework for learning AI Agents"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "MiniAgent Team", email = "miniagent@example.com" },
+]
+keywords = [
+    "agent",
+    "ai",
+    "llm",
+    "cli",
+    "tool-calling",
+    "miniagent",
+    "deepseek",
+    "openai",
+    "code-generation",
+    "automation",
+    "agentic",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "distro>=1.8.0",
+    "openai>=1.0.0",
+    "psutil>=5.9.0",
+    "python-dotenv>=0.19.0",
+    "requests>=2.31.0",
+    "rich>=13.0.0",
+    "tenacity>=8.0.0",
+]
+
+[project.urls]
+"Bug Tracker" = "https://github.com/ZhuLinsen/MiniAgent/issues"
+Documentation = "https://github.com/ZhuLinsen/MiniAgent#readme"
+Source = "https://github.com/ZhuLinsen/MiniAgent"
+
+[project.scripts]
+miniagent = "miniagent.cli:main"
+
+[project.optional-dependencies]
+docx = [
+    "python-docx>=0.8.11",
+]
+dev = [
+    "pytest>=8.0.0,<9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0,<9",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["miniagent*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

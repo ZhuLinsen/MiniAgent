@@ -637,7 +637,7 @@ def create_docx(path: str, content: str, title: str = "") -> str:
             if title:
                 f.write(f"{title}\n{'='*len(title)}\n\n")
             f.write(content)
-        return f"python-docx not installed. Created text file instead: {txt_path}\nTo create .docx files, run: pip install python-docx"
+        return f"python-docx not installed. Created text file instead: {txt_path}\nTo create .docx files, run: uv sync --extra docx or pip install python-docx"
 
 
 # Sensitive environment variable name patterns

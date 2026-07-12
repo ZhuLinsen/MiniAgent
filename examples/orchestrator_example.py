@@ -8,8 +8,9 @@ The Orchestrator decomposes complex tasks into sub-tasks and assigns them
 to specialized Workers (each driven by a Skill: coder, researcher, etc.).
 
 Usage:
-    pip install -e .  # install MiniAgent first
-    python examples/orchestrator_example.py
+    uv sync  # install MiniAgent first
+    # or: pip install -e .
+    uv run python examples/orchestrator_example.py
 """
 
 from miniagent import Orchestrator

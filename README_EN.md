@@ -55,9 +55,9 @@ That's the power of minimalism: let the LLM do what it does best — **think and
 
 ```bash
 git clone https://github.com/ZhuLinsen/MiniAgent.git && cd MiniAgent
-pip install -r requirements.txt && pip install -e .
+uv sync
 cp .env.example .env  # Fill in your API Key
-miniagent              # Launch!
+uv run miniagent       # Launch!
 ```
 
 <details>
@@ -65,11 +65,21 @@ miniagent              # Launch!
 
 ### Installation
 
+Recommended with uv:
+
 ```bash
 git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
+uv sync
+```
+
+You can also continue using pip:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-pip install -e .  # Install miniagent command
+pip install -e .
 ```
 
 ### Configuration
@@ -93,7 +103,20 @@ LLM_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai/
 ### Run
 
 ```bash
+uv run miniagent          # or uv run python -m miniagent
+```
+
+If installed with pip:
+
+```bash
 miniagent          # or python -m miniagent
+```
+
+Install the optional Word document dependency:
+
+```bash
+uv sync --extra docx
+# or pip install python-docx
 ```
 
 </details>
