@@ -145,3 +145,60 @@ class TestCheckDangerous:
         
         tool_call = {"name": "bash", "arguments": {"cmd": "rm -rf /"}}
         assert agent._check_dangerous(tool_call) is True
+
+
+class _FakeMessage:
+    """Minimal stand-in for openai.ChatCompletionMessage (attributes, not dict)."""
+
+    def __init__(self, role: str, content: str):
+        self.role = role
+        self.content = content
+
+
+class TestContextManagementNativeFC:
+    """Native FC mode appends OpenAI message objects (not dicts) to history.
+
+    Context compression must handle both dicts and message objects without
+    crashing when the conversation exceeds MAX_CONTEXT_MESSAGES.
+    """
+
+    def test_summarize_handles_mixed_dict_and_object_messages(self):
+        messages = [{"role": "system", "content": "system prompt"}]
+        for i in range(20):
+            messages.append({"role": "user", "content": f"question {i}"})
+            messages.append(_FakeMessage("assistant", f"answer {i}"))
+            messages.append({"role": "tool", "content": f"result {i}"})
+
+        result = MiniAgent._summarize_messages(messages, keep_last=6)
+        # Compressed, system preserved, and no crash on message objects
+        assert len(result) < len(messages)
+        assert result[0]["role"] == "system"
+        assert "summary" in result[1]["content"].lower()
+        assert result[-1]["content"] == "result 19"
+
+    def test_summarize_mixed_below_threshold_unchanged(self):
+        messages = [{"role": "system", "content": "sys"}]
+        messages.append({"role": "user", "content": "hi"})
+        messages.append(_FakeMessage("assistant", "hello"))
+
+        result = MiniAgent._summarize_messages(messages, keep_last=6)
+        assert result is messages  # unchanged below threshold
+
+
+class TestCallLLMErrorHandling:
+    @patch("miniagent.agent.MiniAgent._init_llm_client")
+    def test_missing_api_key_raises_clear_error(self, mock_init):
+        """Missing API key must raise a clear ValueError, not a TypeError."""
+        agent = MiniAgent.__new__(MiniAgent)
+        agent.api_key = None
+        agent.model = "test-model"
+        agent.base_url = None
+        agent.temperature = 0.7
+        agent.client = MagicMock()
+        agent.use_reflector = False
+        agent.reflector = None
+
+        # Call the unwrapped function to avoid tenacity retry delays
+        raw = getattr(MiniAgent._call_llm, "__wrapped__", MiniAgent._call_llm)
+        with pytest.raises(ValueError, match="API key is not set"):
+            raw(agent, [{"role": "user", "content": "hi"}])

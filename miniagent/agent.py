@@ -39,6 +39,26 @@ _DANGEROUS_PATTERNS = [
 
 _DANGEROUS_RE = re.compile("|".join(_DANGEROUS_PATTERNS), re.IGNORECASE)
 
+
+def _message_role(message: Any) -> str:
+    """Return the role of a message, supporting dicts and OpenAI message objects.
+
+    In native Function Calling mode, ``run_with_native_tools`` appends
+    ``ChatCompletionMessage`` objects (not plain dicts) to the message history.
+    Helpers like context compression must read ``role``/``content`` from both.
+    """
+    if isinstance(message, dict):
+        return message.get("role", "")
+    return getattr(message, "role", "")
+
+
+def _message_content(message: Any) -> str:
+    """Return the content of a message, supporting dicts and OpenAI message objects."""
+    if isinstance(message, dict):
+        return message.get("content", "") or ""
+    return getattr(message, "content", "") or ""
+
+
 class MiniAgent:
     """
     Main MiniAgent class, providing core functionality for LLM interaction and tool calling
@@ -403,12 +423,12 @@ If the question is outside the scope of the available tools, use your knowledge 
             LLM response content
         """
         try:
+            if not self.api_key:
+                raise ValueError("API key is not set. Please check your environment variables.")
+
             logger.debug(f"Calling LLM with API key: {self.api_key[:6]}...")
             logger.debug(f"Base URL: {self.base_url or 'default OpenAI'}")
             logger.debug(f"Model: {self.model}")
-            
-            if not self.api_key:
-                raise ValueError("API key is not set. Please check your environment variables.")
             
             # Apply reflection if enabled
             messages = self._maybe_reflect(messages)
@@ -471,7 +491,7 @@ If the question is outside the scope of the available tools, use your knowledge 
         if len(messages) <= keep_last + 2:  # system + enough messages
             return messages
         
-        system = messages[0] if messages[0]["role"] == "system" else None
+        system = messages[0] if _message_role(messages[0]) == "system" else None
         start = 1 if system else 0
         old_messages = messages[start:-keep_last]
         recent = messages[-keep_last:]
@@ -479,8 +499,8 @@ If the question is outside the scope of the available tools, use your knowledge 
         # Build a compact summary of old conversation
         summary_parts = []
         for m in old_messages:
-            role = m.get("role", "")
-            content = (m.get("content", "") or "")[:200]
+            role = _message_role(m)
+            content = _message_content(m)[:200]
             if role == "user":
                 summary_parts.append(f"User asked: {content}")
             elif role == "assistant":
