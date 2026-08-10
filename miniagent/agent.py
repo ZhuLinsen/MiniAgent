@@ -59,15 +59,20 @@ def _message_content(message: Any) -> str:
     return getattr(message, "content", "") or ""
 
 
+def _message_field(message: Any, key: str) -> Any:
+    """Read one field from a message, supporting dicts and OpenAI message objects."""
+    if isinstance(message, dict):
+        return message.get(key)
+    return getattr(message, key, None)
+
+
 def _message_tool_calls(message: Any) -> list:
     """Return the tool_calls of a message, supporting dicts and OpenAI message objects.
 
     Returns an empty list when the message carries no tool calls, so callers can
     treat "has tool calls" as a simple truthiness check.
     """
-    if isinstance(message, dict):
-        return message.get("tool_calls") or []
-    return getattr(message, "tool_calls", None) or []
+    return _message_field(message, "tool_calls") or []
 
 
 class MiniAgent:
@@ -519,25 +524,17 @@ If the question is outside the scope of the available tools, use your knowledge 
         ``tool`` messages are removed rather than sent to the API.
         """
         cleaned: List[Dict[str, str]] = []
-        open_tool_call_ids: set = set()
+        open_ids: set = set()
         for m in messages:
             role = _message_role(m)
             if role == "tool":
-                call_id = m.get("tool_call_id") if isinstance(m, dict) else getattr(m, "tool_call_id", None)
-                # Keep only when its parent assistant(tool_calls) survived.
-                if call_id is not None and call_id not in open_tool_call_ids:
-                    continue
-                cleaned.append(m)
-                continue
-            if role == "assistant":
-                tool_calls = _message_tool_calls(m)
-                open_tool_call_ids = set()
-                for tc in tool_calls:
-                    tc_id = tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
-                    if tc_id is not None:
-                        open_tool_call_ids.add(tc_id)
+                call_id = _message_field(m, "tool_call_id")
+                if call_id is not None and call_id not in open_ids:
+                    continue  # parent assistant(tool_calls) did not survive
+            elif role == "assistant":
+                open_ids = {_message_field(tc, "id") for tc in _message_tool_calls(m)}
             else:
-                open_tool_call_ids = set()
+                open_ids = set()
             cleaned.append(m)
         return cleaned
 
