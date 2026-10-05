@@ -39,6 +39,42 @@ _DANGEROUS_PATTERNS = [
 
 _DANGEROUS_RE = re.compile("|".join(_DANGEROUS_PATTERNS), re.IGNORECASE)
 
+
+def _message_role(message: Any) -> str:
+    """Return the role of a message, supporting dicts and OpenAI message objects.
+
+    In native Function Calling mode, ``run_with_native_tools`` appends
+    ``ChatCompletionMessage`` objects (not plain dicts) to the message history.
+    Helpers like context compression must read ``role``/``content`` from both.
+    """
+    if isinstance(message, dict):
+        return message.get("role", "")
+    return getattr(message, "role", "")
+
+
+def _message_content(message: Any) -> str:
+    """Return the content of a message, supporting dicts and OpenAI message objects."""
+    if isinstance(message, dict):
+        return message.get("content", "") or ""
+    return getattr(message, "content", "") or ""
+
+
+def _message_field(message: Any, key: str) -> Any:
+    """Read one field from a message, supporting dicts and OpenAI message objects."""
+    if isinstance(message, dict):
+        return message.get(key)
+    return getattr(message, key, None)
+
+
+def _message_tool_calls(message: Any) -> list:
+    """Return the tool_calls of a message, supporting dicts and OpenAI message objects.
+
+    Returns an empty list when the message carries no tool calls, so callers can
+    treat "has tool calls" as a simple truthiness check.
+    """
+    return _message_field(message, "tool_calls") or []
+
+
 class MiniAgent:
     """
     Main MiniAgent class, providing core functionality for LLM interaction and tool calling
@@ -403,12 +439,12 @@ If the question is outside the scope of the available tools, use your knowledge 
             LLM response content
         """
         try:
+            if not self.api_key:
+                raise ValueError("API key is not set. Please check your environment variables.")
+
             logger.debug(f"Calling LLM with API key: {self.api_key[:6]}...")
             logger.debug(f"Base URL: {self.base_url or 'default OpenAI'}")
             logger.debug(f"Model: {self.model}")
-            
-            if not self.api_key:
-                raise ValueError("API key is not set. Please check your environment variables.")
             
             # Apply reflection if enabled
             messages = self._maybe_reflect(messages)
@@ -454,16 +490,70 @@ If the question is outside the scope of the available tools, use your knowledge 
             raise
 
     @staticmethod
+    def _find_group_safe_boundary(messages: List[Dict[str, str]], boundary: int, start: int) -> int:
+        """Move a truncation boundary backward so it never splits a tool-call group.
+
+        In native Function Calling mode an ``assistant`` message carrying
+        ``tool_calls`` must stay paired with **every** following ``tool`` message
+        that answers those calls. When the assistant emits parallel tool calls,
+        a naive ``messages[-keep_last:]`` slice can land in the middle of that
+        group and leave orphaned ``tool`` messages whose
+        ``assistant(tool_calls)`` parent was dropped — the OpenAI API rejects
+        such a sequence.
+
+        Args:
+            messages: Full message list
+            boundary: Proposed index of the first kept message
+            start: Lowest index that may be kept (0, or 1 when a system prompt leads)
+
+        Returns:
+            An index <= boundary that starts on a complete group.
+        """
+        # A boundary sitting on a tool response is inside a group: walk back to
+        # the assistant(tool_calls) message that owns it.
+        while boundary > start and _message_role(messages[boundary]) == "tool":
+            boundary -= 1
+        return boundary
+
+    @staticmethod
+    def _drop_orphan_tool_messages(messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """Drop ``tool`` messages that have no preceding ``assistant(tool_calls)``.
+
+        Acts as a final safety net: if a group could not be preserved (for
+        example the group is longer than the whole keep window), the unpaired
+        ``tool`` messages are removed rather than sent to the API.
+        """
+        cleaned: List[Dict[str, str]] = []
+        open_ids: set = set()
+        for m in messages:
+            role = _message_role(m)
+            if role == "tool":
+                call_id = _message_field(m, "tool_call_id")
+                if call_id is not None and call_id not in open_ids:
+                    continue  # parent assistant(tool_calls) did not survive
+            elif role == "assistant":
+                open_ids = {_message_field(tc, "id") for tc in _message_tool_calls(m)}
+            else:
+                open_ids = set()
+            cleaned.append(m)
+        return cleaned
+
+    @staticmethod
     def _summarize_messages(messages: List[Dict[str, str]], keep_last: int = 6) -> List[Dict[str, str]]:
         """
         Compress conversation history when it grows too long.
         
         Keeps the system prompt + a summary of old messages + the last N messages.
         This prevents token overflow in long-running sessions.
+
+        The recent-message boundary is expanded backward when needed so that an
+        ``assistant`` message with ``tool_calls`` is never separated from the
+        ``tool`` messages answering it (see ``_find_group_safe_boundary``). This
+        means slightly more than ``keep_last`` messages may be kept verbatim.
         
         Args:
             messages: Full message list
-            keep_last: Number of recent messages to keep verbatim
+            keep_last: Minimum number of recent messages to keep verbatim
             
         Returns:
             Compressed message list
@@ -471,16 +561,24 @@ If the question is outside the scope of the available tools, use your knowledge 
         if len(messages) <= keep_last + 2:  # system + enough messages
             return messages
         
-        system = messages[0] if messages[0]["role"] == "system" else None
+        system = messages[0] if _message_role(messages[0]) == "system" else None
         start = 1 if system else 0
-        old_messages = messages[start:-keep_last]
-        recent = messages[-keep_last:]
+
+        boundary = max(len(messages) - keep_last, start)
+        boundary = MiniAgent._find_group_safe_boundary(messages, boundary, start)
+
+        old_messages = messages[start:boundary]
+        recent = messages[boundary:]
+
+        # Everything was needed to keep tool-call groups intact — nothing to compress.
+        if not old_messages:
+            return messages
         
         # Build a compact summary of old conversation
         summary_parts = []
         for m in old_messages:
-            role = m.get("role", "")
-            content = (m.get("content", "") or "")[:200]
+            role = _message_role(m)
+            content = _message_content(m)[:200]
             if role == "user":
                 summary_parts.append(f"User asked: {content}")
             elif role == "assistant":
@@ -498,7 +596,7 @@ If the question is outside the scope of the available tools, use your knowledge 
         if system:
             result.append(system)
         result.append(summary_msg)
-        result.extend(recent)
+        result.extend(MiniAgent._drop_orphan_tool_messages(recent))
         return result
 
     def _check_dangerous(self, tool_call: Dict) -> bool:
