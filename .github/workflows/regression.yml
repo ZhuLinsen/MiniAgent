@@ -1,0 +1,24 @@
+name: Stacked PR Regression
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install this stage and available extras
+        run: python -m pip install -e ".[mcp,legacy]" "pytest>=9.0.3,<10"
+      - run: python -m pytest tests -q -m "not live"
+      - run: python -m compileall -q miniagent
+      - run: python scripts/source_stats.py
