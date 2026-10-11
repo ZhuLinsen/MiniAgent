@@ -32,3 +32,25 @@ Windows baseline: 189 passed, 2 failures caused by Unix-only `sleep` in timeout
 tests. Those tests now invoke the running Python interpreter on every platform.
 Original commit `4d61483d039e802f6d34fb6b42d6e2a99b1b6a1c`: 20 files,
 4,009 physical lines, 3,288 nonempty lines.
+
+## Models
+
+Python >=3.11; validated SDK: any-llm-sdk 1.33.0. SDK HTTP normalization and
+stream assembly are tested without a remote service. Real DeepSeek/Qwen/Claude
+calls have not been validated without explicit test credentials.
+Use `Harness(model="provider:model-id")` with the provider's environment key.
+Custom JSON configuration:
+
+```json
+{"llm": {"model": "gateway:model-id"}, "providers": {"gateway": {
+  "type": "openai-compatible", "base_url": "https://example.com/v1",
+  "api_key_env": "GATEWAY_API_KEY"
+}}}
+```
+
+Pass `providers=cfg.providers` to Harness. Empty key configuration is supported
+only for explicitly configured keyless custom endpoints. Base URL overrides
+use compatibility mode. Native provider clients retain SDK retry behavior;
+custom endpoints disable retries. The loop never retries tools or interrupted
+streams. `temperature=None` leaves provider defaults unchanged.
+Run live tests with `MINIAGENT_TEST_MODEL` and `python -m pytest -m live -v`.
