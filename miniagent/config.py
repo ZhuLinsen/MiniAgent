@@ -51,6 +51,7 @@ class AgentConfig:
     bash_max_output: int = 50000     # BASH_MAX_OUTPUT: bash output truncation limit
     tool_result_limit: int = 16000   # TOOL_RESULT_LIMIT: tool result truncation limit
     max_context_messages: int = 20   # MAX_CONTEXT_MESSAGES: auto-compress conversation after N messages
+    context_budget: int = 32768     # MINIAGENT_CONTEXT_BUDGET: conservative token budget
     confirm_dangerous: bool = True   # CONFIRM_DANGEROUS: require confirmation for dangerous commands
 
 def load_config(config_path: Optional[str] = None) -> AgentConfig:
@@ -122,6 +123,7 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
     config.bash_max_output = _safe_int("BASH_MAX_OUTPUT", config.bash_max_output)
     config.tool_result_limit = _safe_int("TOOL_RESULT_LIMIT", config.tool_result_limit)
     config.max_context_messages = _safe_int("MAX_CONTEXT_MESSAGES", config.max_context_messages)
+    config.context_budget = _safe_int("MINIAGENT_CONTEXT_BUDGET", config.context_budget)
     if os.environ.get("CONFIRM_DANGEROUS") is not None:
         config.confirm_dangerous = os.environ["CONFIRM_DANGEROUS"].lower() not in ("0", "false", "no")
     if os.environ.get("ENABLE_REFLECTION") is not None:

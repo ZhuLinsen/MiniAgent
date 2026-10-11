@@ -856,14 +856,16 @@ async def agent_loop(app, query, *, max_steps=10, stream=None):
     if backend is None:
         raise ValueError("An LLM backend is required")
     if not app.messages:
-        app.messages.append({"role": "system", "content": app.system_prompt})
-    app.messages.append({"role": "user", "content": query})
+        app.record({"role": "system", "content": app.system_prompt})
+    app.record({"role": "user", "content": query})
     for step in range(max_steps):
         await app.emit("agent.step", step=step)
         await app.emit("llm.request", step=step)
-        message = await backend.complete(app.messages, app.registry.schemas(), stream)
+        from .session import context_view
+        view = await context_view(app, backend)
+        message = await backend.complete(view, app.registry.schemas(), stream)
         await app.emit("llm.response", usage=getattr(backend, "usage", {}))
-        app.messages.append(message)
+        app.record(message)
         calls = message.get("tool_calls") or []
         if not calls:
             return message.get("content") or ""
@@ -874,12 +876,15 @@ async def agent_loop(app, query, *, max_steps=10, stream=None):
                 args = json.loads(call["function"]["arguments"])
                 if not isinstance(args, dict):
                     raise ValueError("Tool arguments must be an object")
-                result = await app.registry.execute(name, args, app.policy)
+                def started():
+                    if app.session:
+                        app.session.append("tool_started", call_id=call["id"])
+                result = await app.registry.execute(name, args, app.policy, started)
                 content = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)
                 error = False
             except Exception as exc:
                 content, error = f"Tool failed: {type(exc).__name__}: {exc}", True
             content = smart_truncate(content, int(os.environ.get("TOOL_RESULT_LIMIT", "16000")))
-            app.messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
+            app.record({"role": "tool", "tool_call_id": call["id"], "content": content}, tool=True)
             await app.emit("tool.end", name=name, call_id=call["id"], error=error)
     raise RuntimeError("Agent reached max_steps before a final answer")

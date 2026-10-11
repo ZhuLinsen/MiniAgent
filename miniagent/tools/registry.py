@@ -43,10 +43,12 @@ class Registry:
         return [t.schema() for n, t in self.tools.items()
                 if self.allowed is None or n in self.allowed]
 
-    async def execute(self, name, arguments, policy):
+    async def execute(self, name, arguments, policy, on_start=None):
         tool = self.get(name)
         Draft202012Validator(tool.parameters).validate(arguments)
         arguments = dict(arguments)
         await policy.authorize(tool, arguments)
+        if on_start:
+            on_start()
         result = tool.executor(**arguments)
         return await result if inspect.isawaitable(result) else result
