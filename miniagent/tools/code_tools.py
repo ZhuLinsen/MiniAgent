@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -17,12 +18,17 @@ from ..logger import get_logger
 from ..utils.text_utils import smart_truncate
 
 logger = get_logger(__name__)
+_workspace = ContextVar("miniagent_workspace", default=None)
 
 
 def _resolve_path(path: str) -> Path:
     p = Path(path).expanduser()
     if not p.is_absolute():
         p = (Path.cwd() / p).resolve()
+    p = p.resolve()
+    workspace = _workspace.get()
+    if workspace is not None and not p.is_relative_to(workspace):
+        raise PermissionError("Path is outside workspace")
     return p
 
 
@@ -42,7 +48,9 @@ def _iter_files(root: Path) -> List[Path]:
         return [root]
     if not root.exists():
         return []
-    return [p for p in root.rglob("*") if p.is_file()]
+    workspace = _workspace.get()
+    return [p for p in root.rglob("*") if p.is_file()
+            and (workspace is None or p.resolve().is_relative_to(workspace))]
 
 
 @register_tool
@@ -146,7 +154,9 @@ def glob(pattern: str, path: str = ".") -> List[str]:  # noqa: A002
         return []
     try:
         matches = root.glob(pattern)
-        return [str(p.resolve()) for p in matches]
+        workspace = _workspace.get()
+        return [str(p.resolve()) for p in matches
+                if workspace is None or p.resolve().is_relative_to(workspace)]
     except Exception as e:
         logger.exception("glob failed")
         return [f"error: glob failed: {e}"]

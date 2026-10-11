@@ -846,3 +846,39 @@ If the question is outside the scope of the available tools, use your knowledge 
         if mode == "native":
             return self.run_with_native_tools(query, max_iterations)
         return self.run_with_tools(query, max_iterations)
+
+
+async def agent_loop(app, query, *, max_steps=10, stream=None):
+    """Native loop shared by the Harness; messages never contain SDK objects."""
+    if max_steps < 1:
+        raise ValueError("max_steps must be positive")
+    if app.backend is None:
+        raise ValueError("An LLM backend is required")
+    if not app.messages:
+        app.messages.append({"role": "system", "content": app.system_prompt})
+    app.messages.append({"role": "user", "content": query})
+    for step in range(max_steps):
+        await app.emit("agent.step", step=step)
+        await app.emit("llm.request", step=step)
+        message = await app.backend.complete(app.messages, app.registry.schemas(), stream)
+        await app.emit("llm.response", usage=getattr(app.backend, "usage", {}))
+        app.messages.append(message)
+        calls = message.get("tool_calls") or []
+        if not calls:
+            return message.get("content") or ""
+        for call in calls:
+            name = call["function"]["name"]
+            await app.emit("tool.start", name=name, call_id=call["id"])
+            try:
+                args = json.loads(call["function"]["arguments"])
+                if not isinstance(args, dict):
+                    raise ValueError("Tool arguments must be an object")
+                result = await app.registry.execute(name, args, app.policy)
+                content = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)
+                error = False
+            except Exception as exc:
+                content, error = f"Tool failed: {type(exc).__name__}: {exc}", True
+            content = smart_truncate(content, int(os.environ.get("TOOL_RESULT_LIMIT", "16000")))
+            app.messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
+            await app.emit("tool.end", name=name, call_id=call["id"], error=error)
+    raise RuntimeError("Agent reached max_steps before a final answer")
