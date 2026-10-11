@@ -93,5 +93,7 @@ Tools are namespaced as local__tool. All calls require policy approval even
 if the server declares read-only annotations. The connection has a dedicated
 owner task to close its context in the same task that entered it.
 Discovery failure rolls back tools/services; unload closes the process.
+Remote names are closure-bound: a payload field such as `_name` is forwarded as
+data and cannot change the approved tool route or bypass the Skill whitelist.
 Old MCPClient and load_mcp_tools APIs fail with an actionable migration message.
 Streamable HTTP is deferred.

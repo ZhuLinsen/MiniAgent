@@ -1,6 +1,6 @@
 """Local real-SDK stdio server used by integration tests (stdout is protocol)."""
 import os
-from typing import TypedDict
+from typing_extensions import TypedDict
 from mcp.server.mcpserver import MCPServer
 
 app = MCPServer("test")
