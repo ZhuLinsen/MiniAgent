@@ -35,9 +35,12 @@ Original commit `4d61483d039e802f6d34fb6b42d6e2a99b1b6a1c`: 20 files,
 
 ## Models
 
-Model selection is explicit: CLI `--model` > JSON `llm.model` > `LLM_MODEL`.
+Model selection is explicit: CLI `--model` > JSON `llm.model` > `LLM_MODEL` >
+saved connection default. [Interactive connection setup](model-connections.md)
+is available through `--connect`, `/connect` and `/models`.
 There is no implicit model default. A provider key or API base alone cannot
-select a model; both CLIs fail before client creation when it is missing.
+select a model; noninteractive calls fail before client creation when it is missing.
+The native CLI offers first-run guidance in a TTY; the legacy CLI keeps explicit setup.
 Credentials are resolved after the final model, including JSON and CLI overrides.
 Unprefixed IDs use OpenAI unless an explicit legacy compatibility endpoint is set;
 prefer `provider:model-id`. `LLM_API_KEY`/`LLM_API_BASE` are intentional gateway

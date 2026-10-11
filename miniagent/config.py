@@ -6,6 +6,7 @@ import os
 import json
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
+from .connections import credential, read_profiles
 
 # Try to import dotenv if installed
 try:
@@ -65,12 +66,13 @@ def load_config(config_path: Optional[str] = None, *, model_override=None, base_
         Loaded configuration
     """
     # Default configuration
-    config = AgentConfig()
+    profile = read_profiles()
+    config = AgentConfig(providers=dict(profile["providers"]))
     
     # Explicit compatibility credentials belong to the selected endpoint.
     config.llm.api_key = os.environ.get("LLM_API_KEY")
     config.llm.api_base = base_override or os.environ.get("LLM_API_BASE")
-    config.llm.model = os.environ.get("LLM_MODEL", "")
+    config.llm.model = os.environ.get("LLM_MODEL") or profile["model"]
     aliases = {
         "openai": ("OPENAI_API_KEY", "OPENAI_API_BASE"),
         "deepseek": ("DEEPSEEK_API_KEY", "DEEPSEEK_API_BASE"),
@@ -110,6 +112,7 @@ def load_config(config_path: Optional[str] = None, *, model_override=None, base_
         
     if config_path:
         _load_file(config, config_path)
+        config.providers = {**profile["providers"], **config.providers}
     if model_override is not None:
         config.llm.model = model_override
     if base_override is not None:
@@ -128,9 +131,14 @@ def load_config(config_path: Optional[str] = None, *, model_override=None, base_
         provider = next((p for p in aliases if p in base), "openai")
         if "generativelanguage.googleapis.com" in base:
             provider = "gemini"
-    if provider not in config.providers:
+    persisted = provider in profile["models"]
+    if provider in config.providers:
+        env = config.providers[provider].get("api_key_env")
+        if env:
+            config.llm.api_key = config.llm.api_key or credential(env, persisted=persisted)
+    else:
         key, base = aliases.get(provider, (provider.upper() + "_API_KEY", None))
-        config.llm.api_key = config.llm.api_key or os.environ.get(key)
+        config.llm.api_key = config.llm.api_key or credential(key, persisted=persisted)
         config.llm.api_base = config.llm.api_base or (os.environ.get(base) if base else None)
         if provider == "gemini":
             config.llm.api_key = config.llm.api_key or os.environ.get("GOOGLE_API_KEY")

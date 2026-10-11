@@ -16,7 +16,9 @@ python -m pip install .
 
 在项目内创建 `.env`，填入自己的 Provider 密钥和模型 ID。下面的 `<model-id>` 必须替换；Qwen 使用 `dashscope:<model-id>` 和 `DASHSCOPE_API_KEY`，Claude 使用 `anthropic:<model-id>` 和 `ANTHROPIC_API_KEY`。
 
-必须显式选择模型；只设置密钥或 API 地址时，CLI 会在创建客户端前提示缺少模型。`--model` 优先于 JSON 中的 `llm.model`，再优先于 `LLM_MODEL`。
+也可以直接运行 `miniagent --connect` 交互配置；首次交互启动缺少模型或凭据时会自动引导。REPL 的 `/connect` 配置服务商，`/models` 选择模型；详见[连接与凭据说明](docs/model-connections.md)。
+
+必须显式选择模型；非交互调用只设置密钥或 API 地址时，CLI 会在创建客户端前提示缺少模型。优先级为 `--model`、JSON 中的 `llm.model`、`LLM_MODEL`、已保存的连接默认值。
 
 ```dotenv
 DEEPSEEK_API_KEY=your-provider-key
@@ -38,7 +40,7 @@ miniagent
 - JSONL 会话、完整工具组的上下文压缩，以及异常副作用的人工核查恢复。
 - 可切换的 Skill 执行白名单；官方 MCP SDK stdio 接入（可选安装）。
 
-CLI 可用 `/help`、`/model`、`/plugins`、`/skills`、`/session`、`/stream`；`/plugins` 当前仅列出已加载插件。`--session <path>` 恢复已有会话，`/session new` 新建会话。模型切换会新建会话。
+CLI 可用 `/help`、`/connect`、`/models`、`/model`、`/plugins`、`/skills`、`/session`、`/stream`；`/plugins` 当前仅列出已加载插件。`--session <path>` 恢复已有会话，`/session new` 新建会话。模型切换会新建会话。
 
 ## Python API
 

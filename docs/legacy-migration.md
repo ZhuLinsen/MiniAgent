@@ -13,7 +13,8 @@ v0.2.0a1 retains the existing `MiniAgent` API and `--legacy` entry point.
 | `utils/reflector.py` | 197 | Replace with an explicitly installed plugin only if real users need it. |
 | `extensions/orchestrator.py` | 194 | Keep deferred; design a separate extension rather than enlarge the kernel. |
 
-Counts come from `python scripts/source_stats.py` on the current working tree.
+Counts are a snapshot at commit `fccd011`; rerun `python scripts/source_stats.py`
+for the current revision.
 These modules are coupled: subtracting their counts does not prove that the
 remaining package builds or preserves public imports. Check wrappers, exports,
 registry initialization, example usage and dependency metadata together.
@@ -29,7 +30,8 @@ registry initialization, example usage and dependency metadata together.
 5. Validate real provider task traces before declaring stable v0.3. Current
    Anspire gateway evidence does not establish native Claude API compatibility.
 
-The 2,000–2,800 total-source target remains unfulfilled at 4,770 package lines.
+The 2,000–2,800 total-source target remains unfulfilled (4,770 package lines
+at `fccd011`; the connection guide adds CLI capability and increases that total).
 Keep the four-file core (521) and seven-file runtime mechanisms (823) separate
 from that total. Removal must not sacrifice recovery or permission checks to hit
 a line count. Dynamic dependency recovery and interactive plugin management stay deferred.

@@ -18,7 +18,7 @@ from miniagent import Harness
 from miniagent.plugins import coding_tools
 from miniagent.policy import Policy
 
-assert all(importlib.util.find_spec(name) is None for name in ("psutil", "requests", "mcp"))
+assert all(importlib.util.find_spec(name) is None for name in ("psutil", "requests", "mcp", "keyring"))
 class Backend:
     async def complete(self, messages, tools, stream):
         return {"role": "assistant", "content": "installed wheel works"}

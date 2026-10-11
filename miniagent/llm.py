@@ -31,30 +31,7 @@ class LLMBackend:
         if client is not None:
             self.client = client
             return
-        custom = (providers or {}).get(provider)
-        if custom:
-            if custom.get("type") != "openai-compatible" or not custom.get("base_url"):
-                raise ValueError("Custom provider requires type and base_url")
-            env = custom.get("api_key_env")
-            if env and not api_key and not os.environ.get(env):
-                raise ValueError(f"Missing provider credential environment: {env}")
-            self.client = AnyLLM.create_openai_compatible(
-                name=provider, api_base=custom["base_url"],
-                api_key=api_key or (os.environ.get(env) if env else "local-no-key"),
-                unified_exceptions=True, max_retries=0,
-            )
-        elif base_url:
-            # An explicitly configured compatibility endpoint owns its explicit key.
-            env = AnyLLM.get_provider_class(provider).ENV_API_KEY_NAME
-            key = api_key or os.environ.get(env)
-            if not key:
-                raise ValueError(f"Missing credential: {env}")
-            self.client = AnyLLM.create_openai_compatible(
-                name=provider, api_base=base_url, api_key=key,
-                unified_exceptions=True, max_retries=0,
-            )
-        else:
-            self.client = AnyLLM.create(provider, api_key=api_key, unified_exceptions=True)
+        self.client = provider_client(provider, providers=providers, api_key=api_key, base_url=base_url)
 
     async def complete(self, messages, tools, stream=None):
         options = {"model": self.model, "messages": messages, "timeout": self.timeout,
@@ -123,12 +100,8 @@ class LLMBackend:
                 await close()
 
     async def aclose(self):
-        raw = getattr(self.client, "client", None)
-        close = getattr(raw, "aclose", None) or getattr(raw, "close", None)
-        if close:
-            result = close()
-            if inspect.isawaitable(result):
-                await result
+        await close_client(self.client)
+
 
 
 def llm_plugin(model, **options):
@@ -137,3 +110,40 @@ def llm_plugin(model, **options):
         ctx.cleanup(backend.aclose)
         ctx.service("llm", backend)
     return Plugin("llm", setup)
+
+
+def provider_client(provider, *, providers=None, api_key=None, base_url=None):
+    """Shared SDK construction for completion and CLI model discovery."""
+    custom = (providers or {}).get(provider)
+    if custom:
+        if custom.get("type") != "openai-compatible" or not custom.get("base_url"):
+            raise ValueError("Custom provider requires type and base_url")
+        env = custom.get("api_key_env")
+        if env and not api_key and not os.environ.get(env):
+            raise ValueError(f"Missing provider credential environment: {env}")
+        return AnyLLM.create_openai_compatible(
+            name=provider, api_base=custom["base_url"],
+            api_key=api_key or (os.environ.get(env) if env else "local-no-key"),
+            unified_exceptions=True, max_retries=0,
+        )
+    elif base_url:
+        # An explicitly configured compatibility endpoint owns its explicit key.
+        env = AnyLLM.get_provider_class(provider).ENV_API_KEY_NAME
+        key = api_key or os.environ.get(env)
+        if not key:
+            raise ValueError(f"Missing credential: {env}")
+        return AnyLLM.create_openai_compatible(
+            name=provider, api_base=base_url, api_key=key,
+            unified_exceptions=True, max_retries=0,
+        )
+    else:
+        return AnyLLM.create(provider, api_key=api_key, unified_exceptions=True)
+
+
+async def close_client(client):
+    raw = getattr(client, "client", None)
+    close = getattr(raw, "aclose", None) or getattr(raw, "close", None)
+    if close:
+        result = close()
+        if inspect.isawaitable(result):
+            await result
