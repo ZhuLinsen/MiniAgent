@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- [新功能] Agent Loop 成为默认插件服务，可通过 loop_plugin 替换；Harness 继续管理互斥、会话锁和不确定副作用守卫。
+- [新功能] Harness(reactive=True) 支持 PENDING 依赖等待、requires 插件依赖和 inject 服务依赖、传递失活与重新激活；默认静态模式保持严格行为。
+- [修复] 插件初始化与清理同时失败时保留两类异常；关闭的 Scope 和任务运行中的资源注册被拒绝。
+- [测试] 覆盖依赖恢复、传递清理、循环依赖、失败回滚、取消和可替换 Loop；MCP 卸载后保留默认 Loop，整体关闭仍清空资源。
+
 - [新功能] 原生 CLI 增加首次模型引导、--connect、/connect、/models 和自定义兼容 API；模型目录不可用时手动输入 ID。
 - [改进] 连接默认值原子保存到 MINIAGENT_HOME，密钥使用环境变量、可选系统凭据库或当前进程内存；错误输出隐藏已知凭据。
 - [测试] 覆盖模型配置优先级、取消、密钥不落盘、SDK 模型目录协议和切换清理，CI 审计 credentials 可选依赖。

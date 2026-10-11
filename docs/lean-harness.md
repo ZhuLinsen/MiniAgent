@@ -9,7 +9,10 @@ Each PR targets its predecessor. Merge in order; revert in reverse order.
 The runtime is async; use `await app.arun()` in an existing event loop.
 `app.run()` is a script convenience. One task per Harness/Session at a time.
 Plugins change only while idle. Startup dependency sorting, rollback and
-reverse cleanup are supported; automatic dependency recovery is deferred.
+reverse cleanup are supported. `Harness(reactive=True)` opts into dependency
+waiting, transitive deactivation and restoration on the next reconciliation;
+the default remains strict. [Lifecycle and Loop contracts](plugin-lifecycle.md)
+describe service injection and replacement of the default `agent-loop` plugin.
 Tools pass through one validation/authorization entry point.
 
 Python plugins and MCP servers are trusted software. Workspace checks cover
@@ -18,7 +21,7 @@ authorization; this is not a sandbox. Noninteractive approval defaults to deny.
 Provider keys are isolated. Tool arguments and key prefixes must not be logged.
 
 Sessions preserve original events and do not replay uncertain side effects.
-Compaction changes only the model view. Dynamic plugins, Subagent and long-term
+Compaction changes only the model view. Fiber trees, HMR, Subagent and long-term
 Memory are deferred. Source line counts are observations, not release gates.
 
 ## Validation
@@ -158,7 +161,7 @@ Optional basic/system tools now require `miniagent[legacy]` and explicit loading
 The default runtime does not import legacy parsers or Reflection. README changes
 are synchronized in Chinese and English; detailed migration remains here.
 
-## Local acceptance evidence
+## Local acceptance evidence (snapshot `fccd011`)
 
 Windows / Python 3.12: 249 deterministic tests passed (3 live cases excluded).
 Two selected models separately passed the three live cases via Anspire.
@@ -199,7 +202,8 @@ The [v0.3 migration proposal](legacy-migration.md) covers Legacy, optional tools
 and the old text parser. Current installation/startup measurements and a real
 read/edit/test demo are in [the acceptance report](acceptance-2026-10-11.md).
 Before/after comparison and native-provider validation remain open.
-Automatic dependency recovery and interactive plugin management remain deferred.
+Reactive dependency reconciliation is now opt-in; interactive plugin management,
+Fiber trees and HMR remain deferred.
 Review readiness is not a stable-release or complete-plan acceptance claim.
 Merge #6 → #7 → #8 → #9 → #10 → #11; use merge commits to preserve stacked
 ancestry, or explicitly retarget/rebase each successor after a squash. The safety

@@ -34,7 +34,8 @@ The 2,000–2,800 total-source target remains unfulfilled (4,770 package lines
 at `fccd011`; the connection guide adds CLI capability and increases that total).
 Keep the four-file core (521) and seven-file runtime mechanisms (823) separate
 from that total. Removal must not sacrifice recovery or permission checks to hit
-a line count. Dynamic dependency recovery and interactive plugin management stay deferred.
+a line count. Reactive dependency reconciliation is now opt-in; interactive
+plugin management and HMR stay deferred.
 
 Rollback a removal PR by reverting it and restoring its compatible dependency
 metadata; preserve session data. Do not automatically replay interrupted tools.

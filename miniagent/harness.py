@@ -1,4 +1,4 @@
-"""Small static plugin runtime with instance ownership and async cleanup."""
+"""Plugin runtime with instance ownership, async cleanup and opt-in reconciliation."""
 import asyncio
 import inspect
 from contextlib import AsyncExitStack
@@ -13,31 +13,44 @@ class Plugin:
     name: str
     setup: object
     requires: tuple = ()
+    inject: tuple = ()
 
 
 class Scope:
     def __init__(self, app):
         self.app, self.stack = app, AsyncExitStack()
+        self.provided, self.setting_up, self.closed = set(), True, False
+
+    def _registration(self):
+        if self.closed:
+            raise RuntimeError("Plugin scope is closed")
+        if not self.setting_up:
+            self.app._idle()
 
     def service(self, name, value):
+        self._registration()
         if name in self.app.services:
             raise ValueError(f"Duplicate service: {name}")
         self.app.services[name] = value
+        self.provided.add(name)
         self.stack.callback(self.app.services.pop, name)
 
     def get(self, name):
         return self.app.services[name]
 
     def tool(self, tool):
+        self._registration()
         self.app.registry.add(tool)
         self.stack.callback(self.app.registry.tools.pop, tool.name)
 
     def on(self, event, callback):
+        self._registration()
         listeners = self.app.events.setdefault(event, [])
         listeners.append(callback)
         self.stack.callback(listeners.remove, callback)
 
     def cleanup(self, callback, *args):
+        self._registration()
         async def invoke():
             result = callback(*args)
             if inspect.isawaitable(result):
@@ -48,7 +61,7 @@ class Scope:
 class Harness:
     def __init__(self, backend=None, *, model=None, providers=None, api_key=None,
                  base_url=None, temperature=None, policy=None,
-                 session=None, context_budget=32768,
+                 session=None, context_budget=32768, reactive=False,
                  system_prompt="You are a helpful assistant."):
         self.services, self.events, self.plugins, self.active = {}, {}, {}, {}
         self.registry = Registry()
@@ -61,6 +74,9 @@ class Harness:
         self._base_prompt = system_prompt
         self._base_temperature = temperature
         self.skill = None
+        self.reactive = reactive
+        from .agent import loop_plugin
+        self.use(loop_plugin())
         if model:
             from .llm import llm_plugin
             self.use(llm_plugin(model, providers=providers, api_key=api_key,
@@ -99,12 +115,16 @@ class Harness:
             self.busy = False
 
     async def _start(self):
+        self._check_cycles()
         pending = {n: p for n, p in self.plugins.items() if n not in self.active}
         added = []
         try:
             while pending:
-                ready = [p for p in pending.values() if all(n in self.active for n in p.requires)]
+                ready = [p for p in pending.values() if all(n in self.active for n in p.requires)
+                         and all(n in self.services for n in p.inject)]
                 if not ready:
+                    if self.reactive:
+                        break  # Registered dependents wait for a later start/provider change.
                     raise ValueError("Missing or cyclic plugin dependency")
                 for plugin in ready:
                     scope = Scope(self)
@@ -112,33 +132,74 @@ class Harness:
                         result = plugin.setup(scope)
                         if inspect.isawaitable(result):
                             await result
-                    except BaseException:
-                        await scope.stack.aclose()
+                    except BaseException as failure:
+                        scope.closed = True
+                        try:
+                            await scope.stack.aclose()
+                        except BaseException as error:
+                            raise BaseExceptionGroup("Plugin setup and cleanup failed", [failure, error])
                         raise
+                    finally:
+                        scope.setting_up = False
                     self.active[plugin.name] = scope
                     added.append(plugin.name)
                     pending.pop(plugin.name)
         except BaseException as failure:
-            errors = [failure]
-            for name in reversed(added):
-                try:
-                    await self.active.pop(name).stack.aclose()
-                except BaseException as error:
-                    errors.append(error)
+            errors = [failure, *await self._close_scopes(reversed(added))]
             if len(errors) > 1:
                 raise BaseExceptionGroup("Plugin activation and rollback failed", errors)
             raise
 
+    @property
+    def states(self):
+        return {name: "ACTIVE" if name in self.active else "PENDING" for name in self.plugins}
+
+    def _check_cycles(self):
+        visited = set()
+        def visit(name, path):
+            if name in path:
+                raise ValueError("Cyclic plugin dependency")
+            if name not in visited:
+                for dependency in self.plugins[name].requires:
+                    if dependency in self.plugins:
+                        visit(dependency, path | {name})
+                visited.add(name)
+        for name in self.plugins:
+            visit(name, set())
+
+    async def _close_scopes(self, names):
+        errors = []
+        for name in names:
+            scope = self.active.pop(name)
+            scope.closed = True
+            try:
+                await scope.stack.aclose()
+            except BaseException as error:
+                errors.append(error)
+        return errors
+
     async def unuse(self, name):
         self._idle()
-        if any(name in self.plugins[n].requires for n in self.active if n != name):
+        if name not in self.plugins:
+            raise KeyError(name)
+        removed, services = {name}, set()
+        while True:
+            services.update(s for n in removed if n in self.active for s in self.active[n].provided)
+            dependents = {n for n in self.active if set(self.plugins[n].requires) & removed
+                          or set(self.plugins[n].inject) & services}
+            if dependents <= removed:
+                break
+            removed.update(dependents)
+        if not self.reactive and removed != {name}:
             raise ValueError("Plugin has active dependents")
         self.busy = True
         try:
-            scope = self.active.pop(name, None)
-            if scope:
-                await scope.stack.aclose()
+            errors = await self._close_scopes(n for n in reversed(tuple(self.active)) if n in removed)
             self.plugins.pop(name)
+            if errors:
+                raise BaseExceptionGroup("Plugin cleanup failures", errors)
+            if self.reactive:
+                await self._start()
         finally:
             self.busy = False
 
@@ -157,12 +218,7 @@ class Harness:
         self._idle()
         self.busy = True
         try:
-            errors = []
-            for name in reversed(tuple(self.active)):
-                try:
-                    await self.active.pop(name).stack.aclose()
-                except BaseException as error:
-                    errors.append(error)
+            errors = await self._close_scopes(reversed(tuple(self.active)))
             if errors:
                 raise BaseExceptionGroup("Plugin cleanup failures", errors)
         finally:
@@ -184,10 +240,12 @@ class Harness:
                 backend = self.backend or self.services.get("llm")
                 if backend and hasattr(backend, "temperature") and self.skill.temperature is not None:
                     backend.temperature = self.skill.temperature
-            from .agent import agent_loop
+            loop = self.services.get("agent_loop")
+            if loop is None:
+                raise ValueError("An active agent_loop service is required")
             if max_steps is None:
                 max_steps = self.skill.max_iterations if self.skill and self.skill.max_iterations is not None else 10
-            return await agent_loop(self, query, max_steps=max_steps, stream=stream)
+            return await loop(self, query, max_steps=max_steps, stream=stream)
         finally:
             try:
                 if not self.session or self.session.lock is not None:

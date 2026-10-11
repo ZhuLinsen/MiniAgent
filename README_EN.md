@@ -35,7 +35,7 @@ Writes, Shell and MCP calls require confirmation by default. Noninteractive conf
 ## Capabilities
 
 - Native tool calls and streamed text; one async model boundary with provider credential isolation.
-- Instance-owned tool registry; plugin dependency ordering, activation rollback and reverse cleanup.
+- Instance-owned tool registry; dependency ordering, activation rollback and reverse cleanup, with a replaceable Agent Loop and opt-in reactive dependency lifecycle.
 - `read / write / edit / grep / glob / bash` with workspace checks and authorization.
 - JSONL sessions, context compaction that preserves whole tool groups, and inspection before resuming uncertain effects.
 - Reversible Skill execution whitelists and optional official MCP SDK stdio integration.
