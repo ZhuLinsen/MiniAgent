@@ -66,6 +66,13 @@ Interrupted started tools are uncertain: inspect their actual effects, then use
 `session.open(); session.resolve(call_id, verified_result); session.close()`.
 The runtime refuses new turns until uncertainty is resolved, and never replays
 tools during restore. Calls not yet started get an interrupted result.
+Exceptions after a non-read tool starts (including Shell/MCP timeouts) stop the
+batch and immediately persist an uncertain result. Remaining calls get paired
+unstarted results. The same guard applies without a persistent Session:
+`app.uncertain` reports pending IDs; `app.resolve(id, verified_result)` clears a
+result only after inspection. Cancellation also repairs the full tool batch.
+Authorization/schema failures before execution are known failures; nonzero
+Shell exit codes are known failed outcomes rather than interrupted results.
 
 `MINIAGENT_CONTEXT_BUDGET` includes schemas and output reserve. UTF-8 bytes are
 used as a conservative token estimate, not an exact provider tokenizer.
@@ -80,6 +87,8 @@ Switching skills or `app.apply_skill()` restores the tool catalog.
 `read_skill(path)` supports scalar name/description and allowed-tools
 (space-separated names or a JSON list) plus Markdown body. This is a limited
 frontmatter format, not full YAML or automatic discovery.
+Scalar `temperature` and positive `max-iterations` are supported. The Skill's
+iteration limit is the default `arun` budget; an explicit `max_steps` overrides it.
 
 Install `miniagent[mcp]` (validated MCP SDK 2.3.0), then:
 
@@ -106,6 +115,11 @@ provider credential; config files accept llm, providers and mcp_servers.
 An MCP entry has command (executable), args (list), and optional env (mapping).
 CLI: --workspace, --policy readonly|confirm|trusted, --session <JSONL path>,
 --skill <name|SKILL.md path>, --prompt, --no-stream.
+Managed files exclude `.env*` except `.env.example`, `.git` and files ending in
+`.pem`, `.key`, `.p12` or `.pfx`. Directory grep/glob also filter these paths.
+Explicit `--allow-sensitive-files` or `Policy(allow_sensitive_files=True)` opts in.
+This does not constrain explicitly trusted Shell/MCP/Python code or detect all
+possible secrets; inspect results before sharing them with a remote model.
 Existing Session files resume automatically. Without --session a new file is
 created under MINIAGENT_HOME/sessions. Non-TTY uses plain literal text; NO_COLOR
 is honored. /plugins lists active plugins; /skills changes the execution view;
@@ -134,13 +148,46 @@ are synchronized in Chinese and English; detailed migration remains here.
 
 ## Local acceptance evidence
 
-Windows / Python 3.12: 219 passed, 1 skipped (live provider credentials not
+Windows / Python 3.12: 236 passed, 3 skipped (live provider credentials not
 provided). Real local MCP stdio subprocess discovery/call/cleanup passed.
 New runtime lint (Ruff F checks), compileall, pip check, wheel and sdist build
 passed. Locked dependencies were upgraded after an audit finding; a repeat
 pip-audit reports no known vulnerabilities. CI adds Linux/Python 3.11 checks;
 those results must be read from the PR, not inferred from local Windows tests.
-New core: 470 physical lines. All official package Python: 4,808 lines, including
+New core: 521 physical lines; core plus Policy/tool plugin/Session: 823 lines.
+All official package Python: 4,784 lines, including
 legacy teaching, optional tools, Reflection and Orchestrator. The 2,800-line
 total budget is not achieved; compatibility removal requires a separate,
 explicitly reviewed migration rather than silently deleting existing APIs.
+
+## Review follow-up and remaining acceptance
+
+The four reviewed interruption/status/Skill regressions have dedicated tests.
+MCP route binding prevents payload fields overriding the registered remote name.
+OpenAI, DeepSeek, DashScope/Qwen and Anthropic native SDK HTTP fixtures exercise
+two-turn tool calls and response conversion; these are offline protocol tests.
+The opt-in live suite now covers basic replies and multi-turn tool use both with
+and without streaming. Run it separately for each configured provider with
+`MINIAGENT_TEST_MODEL` and `python -m pytest -m live -v`; credentials are never
+printed. No live-provider pass is claimed until those runs actually complete.
+
+Every stacked PR has Windows/Linux × Python 3.11/3.12 regression CI. The final
+PR additionally locks dependencies, checks native-runtime Ruff F rules, audits
+production dependencies and installs a built wheel without optional extras.
+`python scripts/minimal_install_smoke.py` requires uv on PATH and one built wheel.
+
+Both READMEs now document the native runtime, supported Python version, plugin
+example and migration guide. CLI parameters have bounded summaries; command and
+content values are hidden. Known Shell/file failures display failed status.
+Logger configuration shares the file-handler implementation (206 → 86 lines),
+preserving its API and cache semantics. Total source remains above the budget.
+
+The v0.3 follow-up requires an explicit compatibility migration for Legacy,
+low-frequency tools and the old text parser; measure installation size/startup
+before and after, validate real provider tasks, then publish an actual task demo.
+Automatic dependency recovery and interactive plugin management remain deferred.
+Review readiness is not a stable-release or complete-plan acceptance claim.
+Merge #6 → #7 → #8 → #9 → #10 → #11; use merge commits to preserve stacked
+ancestry, or explicitly retarget/rebase each successor after a squash. The safety
+and product follow-ups are in #11, so intermediate PRs are migration steps rather
+than standalone release candidates. Roll back dependent PRs in reverse order.

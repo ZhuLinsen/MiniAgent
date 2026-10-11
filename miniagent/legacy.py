@@ -196,7 +196,11 @@ If the question is outside the scope of the available tools, use your knowledge 
             if key not in tool:
                 raise ValueError(f"Tool is missing a required field: {key}")
                 
-        self.tools.append(tool)
+        if hasattr(self, "_skill_catalog"):
+            self._skill_catalog.append(tool)
+        skill = getattr(self, "_active_skill", None)
+        if skill is None or skill.tools is None or tool["name"] in skill.tools:
+            self.tools.append(tool)
         logger.debug(f"Added tool: {tool['name']}")
     
     def load_builtin_tool(self, tool_name: str) -> bool:
@@ -261,6 +265,7 @@ If the question is outside the scope of the available tools, use your knowledge 
             return False
         
         self.system_prompt = skill.prompt
+        self._active_skill = skill
         if skill.temperature is not None:
             self.temperature = skill.temperature
         # Filter tools to skill whitelist

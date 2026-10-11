@@ -71,9 +71,16 @@ def coding_tools():
             else:
                 def executor(_func=func, **kwargs):
                     token = code_tools._workspace.set(ctx.app.policy.workspace)
+                    visibility = code_tools._path_allowed.set(ctx.app.policy.visible)
                     try:
-                        return _func(**kwargs)
+                        result = _func(**kwargs)
+                        failed = isinstance(result, str) and result.startswith("error:")
+                        failed = failed or (isinstance(result, list) and any(
+                            (isinstance(item, dict) and item.get("error")) or
+                            (isinstance(item, str) and item.startswith("error:")) for item in result))
+                        return {"isError": True, "content": result} if failed else result
                     finally:
+                        code_tools._path_allowed.reset(visibility)
                         code_tools._workspace.reset(token)
                 access = "write" if name in {"write", "edit"} else "read"
             ctx.tool(Tool(name, description["description"], description["parameters"], executor, access))

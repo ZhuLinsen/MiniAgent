@@ -20,6 +20,7 @@ def main(argv=None):
     parser.add_argument("--base-url", help="Explicit OpenAI-compatible endpoint")
     parser.add_argument("--temperature", type=float)
     parser.add_argument("--workspace", help="Managed file workspace (default current directory)")
+    parser.add_argument("--allow-sensitive-files", action="store_true", help="Explicitly allow managed access to environment/key files and .git")
     parser.add_argument("--policy", choices=["readonly", "confirm", "trusted"], default="confirm")
     parser.add_argument("--session", help="Session JSONL path; existing sessions resume")
     parser.add_argument("--skill", help="Registered skill or SKILL.md path")

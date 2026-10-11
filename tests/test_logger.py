@@ -57,3 +57,19 @@ def test_get_logger_with_explicit_level():
     """get_logger with explicit level should set that level."""
     lg = get_logger("test_explicit_level", level=logging.ERROR)
     assert lg.level == logging.ERROR
+
+
+def test_file_handler_format_and_cache(tmp_path):
+    path = tmp_path / "nested" / "run.log"
+    logger = get_logger("test_file_handler_regression", logging.WARNING,
+                        format_str="%(levelname)s:%(message)s", log_file=str(path))
+    handler = next(h for h in logger.handlers if isinstance(h, logging.FileHandler))
+    try:
+        logger.warning("fixture message")
+        handler.flush()
+        assert path.read_text() == "WARNING:fixture message\n"
+        assert get_logger("test_file_handler_regression", log_file=str(path)) is logger
+        assert len([h for h in logger.handlers if isinstance(h, logging.FileHandler)]) == 1
+    finally:
+        logger.removeHandler(handler)
+        handler.close()

@@ -45,20 +45,28 @@ async def agent_loop(app, query, *, max_steps=10, stream=None):
             return message.get("content") or ""
         for call in calls:
             name = call["function"]["name"]
-            await app.emit("tool.start", name=name, call_id=call["id"])
+            await app.emit("tool.start", name=name, call_id=call["id"], arguments=call["function"]["arguments"])
+            started_effect = False
+            uncertain = False
             try:
                 args = json.loads(call["function"]["arguments"])
                 if not isinstance(args, dict):
                     raise ValueError("Tool arguments must be an object")
                 def started():
+                    nonlocal started_effect
+                    started_effect = app.registry.get(name).access != "read"
+                    app._started_calls.add(call["id"])
                     if app.session:
                         app.session.append("tool_started", call_id=call["id"])
                 result = await app.registry.execute(name, args, app.policy, started)
                 content = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)
-                error = isinstance(result, dict) and bool(result.get("isError") or result.get("error"))
+                error = isinstance(result, dict) and bool(result.get("isError") or result.get("error") or result.get("exit_code", 0))
             except Exception as exc:
                 content, error = f"Tool failed: {type(exc).__name__}: {exc}", True
+                uncertain = started_effect
             content = smart_truncate(content, int(os.environ.get("TOOL_RESULT_LIMIT", "16000")))
-            app.record({"role": "tool", "tool_call_id": call["id"], "content": content}, tool=True)
+            app.record({"role": "tool", "tool_call_id": call["id"], "content": content}, tool=True, uncertain=uncertain)
             await app.emit("tool.end", name=name, call_id=call["id"], error=error)
+            if uncertain:
+                raise RuntimeError("Tool result is uncertain; inspect effects and resolve before continuing")
     raise RuntimeError("Agent reached max_steps before a final answer")

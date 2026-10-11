@@ -29,10 +29,11 @@ def test_skill_switch_restores_tools_and_enforces_execution(tmp_path):
 
 def test_skill_file(tmp_path):
     path = tmp_path / "SKILL.md"
-    path.write_text('---\nname: test\nallowed-tools: ["read", "grep"]\n---\nRead before changing.')
+    path.write_text('---\nname: test\nallowed-tools: ["read", "grep"]\nmax-iterations: 2\ntemperature: 0.2\n---\nRead before changing.')
     skill = read_skill(path)
     assert skill.tools == ["read", "grep"]
     assert skill.prompt == "Read before changing."
+    assert skill.max_iterations == 2 and skill.temperature == 0.2
 
 
 def test_mcp_real_stdio_denial_call_cleanup():

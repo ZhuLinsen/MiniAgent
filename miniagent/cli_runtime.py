@@ -1,5 +1,6 @@
 """Small Rich CLI; one async runtime owns clients for the whole REPL."""
 import os
+import json
 import sys
 import time
 from pathlib import Path
@@ -39,7 +40,8 @@ async def cli_run(args, *, console=None, backend=None):
     app = Harness(backend, model=None if backend else model, providers=cfg.providers,
                   api_key=args.api_key or cfg.llm.api_key, base_url=args.base_url or cfg.llm.api_base,
                   temperature=args.temperature if args.temperature is not None else cfg.llm.temperature,
-                  policy=Policy(args.workspace, mode=args.policy, approve=approve),
+                  policy=Policy(args.workspace, mode=args.policy, approve=approve,
+                                allow_sensitive_files=getattr(args, "allow_sensitive_files", False)),
                   session=Session(args.session) if args.session else new_session(),
                   context_budget=cfg.context_budget, system_prompt=cfg.system_prompt)
     app.use(coding_tools())
@@ -56,7 +58,13 @@ async def cli_run(args, *, console=None, backend=None):
     def display(ctx):
         def start(event):
             starts[event["call_id"]] = time.monotonic()
-            console.print(Text(f"  • {event['name']}", style="cyan"))
+            try:
+                arguments = json.loads(event.get("arguments", "{}"))
+                details = [f"{key}={str(value)[:120]!r}" if key in {"path", "pattern", "offset", "limit"}
+                           else f"{key}=<{len(str(value))} chars>" for key, value in arguments.items()]
+            except (ValueError, AttributeError):
+                details = ["invalid arguments"]
+            console.print(Text(f"  • {event['name']} {' '.join(details)[:240]}", style="cyan"))
         def end(event):
             elapsed = time.monotonic() - starts.pop(event["call_id"], time.monotonic())
             symbol = "failed" if event["error"] else "done"

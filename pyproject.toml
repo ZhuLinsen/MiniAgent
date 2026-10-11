@@ -63,6 +63,8 @@ dev = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.3,<10",
+    "ruff==0.17.0",
+    "pip-audit==2.10.1",
 ]
 
 [build-system]

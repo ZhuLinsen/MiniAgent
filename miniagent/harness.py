@@ -55,6 +55,7 @@ class Harness:
         self.policy = policy or Policy()
         self.system_prompt, self.backend = system_prompt, backend
         self.messages = []
+        self._started_calls, self._uncertain = set(), set()
         self.busy = False
         self.session, self.context_budget = session, context_budget
         self._base_prompt = system_prompt
@@ -167,7 +168,7 @@ class Harness:
         finally:
             self.busy = False
 
-    async def arun(self, query, *, max_steps=10, stream=None):
+    async def arun(self, query, *, max_steps=None, stream=None):
         self._idle()
         self.busy = True
         try:
@@ -176,21 +177,63 @@ class Harness:
                 if self.session.uncertain:
                     raise RuntimeError("Session has uncertain tool results; inspect and resolve them first")
                 self.messages = self.session.messages
+            if self.uncertain:
+                raise RuntimeError("Harness has uncertain tool results; inspect and resolve them first")
             await self._start()
             if self.skill:
                 backend = self.backend or self.services.get("llm")
                 if backend and hasattr(backend, "temperature") and self.skill.temperature is not None:
                     backend.temperature = self.skill.temperature
             from .agent import agent_loop
+            if max_steps is None:
+                max_steps = self.skill.max_iterations if self.skill and self.skill.max_iterations is not None else 10
             return await agent_loop(self, query, max_steps=max_steps, stream=stream)
         finally:
-            self.busy = False
-            if self.session:
-                self.session.close()
+            try:
+                if not self.session or self.session.lock is not None:
+                    completed = {m.get("tool_call_id") for m in self.messages if m["role"] == "tool"}
+                    for message in tuple(self.messages):
+                        for call in message.get("tool_calls") or []:
+                            if call["id"] not in completed:
+                                unknown = call["id"] in self._started_calls
+                                self.record({"role": "tool", "tool_call_id": call["id"], "content":
+                                    "Interrupted tool; inspect effects before resolving." if unknown else
+                                    "Interrupted before execution; tool was not replayed."}, tool=True, uncertain=unknown)
+                                completed.add(call["id"])
+            finally:
+                self._started_calls.clear()
+                self.busy = False
+                if self.session:
+                    self.session.close()
 
-    def record(self, message, *, tool=False):
+    @property
+    def uncertain(self):
+        return self.session.uncertain if self.session else set(self._uncertain)
+
+    def resolve(self, call_id, content):
+        """Resolve a result only after the caller has inspected actual effects."""
+        self._idle()
         if self.session:
-            self.session.append("tool_completed" if tool else "message", message=message)
+            self.session.open()
+            try:
+                self.session.resolve(call_id, content)
+                self.messages = self.session.messages
+            finally:
+                self.session.close()
+        else:
+            if call_id not in self._uncertain:
+                raise ValueError("Call is not uncertain")
+            for message in self.messages:
+                if message.get("tool_call_id") == call_id:
+                    message["content"] = content
+            self._uncertain.remove(call_id)
+
+    def record(self, message, *, tool=False, uncertain=False):
+        if self.session:
+            self.session.append("tool_completed" if tool else "message", message=message,
+                                **({"uncertain": True} if uncertain else {}))
+        elif uncertain:
+            self._uncertain.add(message["tool_call_id"])
         self.messages.append(message)
 
     def run(self, query, **kwargs):

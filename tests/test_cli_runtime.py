@@ -77,3 +77,21 @@ def test_legacy_native_uses_core_loop():
     assert agent.run("go", mode="native") == "done"
     messages = agent.client.chat.completions.create.call_args.kwargs["messages"]
     assert any(m.get("tool_call_id") == "one" and m["content"] == "3" for m in messages)
+
+
+def test_cli_shows_failed_exit_and_bounded_parameters(tmp_path):
+    import json
+    import sys
+    class Commands:
+        count = 0
+        async def complete(self, messages, tools, stream):
+            self.count += 1
+            if self.count == 1:
+                return {"role": "assistant", "tool_calls": [{"id": "one", "type": "function", "function": {
+                    "name": "bash", "arguments": json.dumps({"cmd": f'"{sys.executable}" -c "raise SystemExit(7)"'})}}]}
+            return {"role": "assistant", "content": "Command failed"}
+    output = io.StringIO()
+    assert asyncio.run(cli_run(options(tmp_path, policy="trusted"), console=Console(file=output, width=80), backend=Commands())) == 0
+    assert "failed bash" in output.getvalue()
+    assert "cmd=<" in output.getvalue()
+    assert "SystemExit" not in output.getvalue()

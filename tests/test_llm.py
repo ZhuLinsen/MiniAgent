@@ -112,3 +112,31 @@ def test_live_provider():
         finally:
             await backend.aclose()
     asyncio.run(scenario())
+
+
+@pytest.mark.live
+@pytest.mark.parametrize("streaming", [False, True])
+def test_live_multi_turn_tool_call(streaming):
+    import os
+    from miniagent import Harness, Plugin
+    from miniagent.policy import Policy
+    from miniagent.tools.registry import Tool
+    model = os.environ.get("MINIAGENT_TEST_MODEL")
+    if not model:
+        pytest.skip("Set MINIAGENT_TEST_MODEL and provider credentials for live tool acceptance")
+    async def scenario():
+        backend = LLMBackend(model)
+        app = Harness(backend, policy=Policy(mode="trusted"), system_prompt=
+                      "Use the add_one tool with n=2 before answering. Report the tool result.")
+        app.use(Plugin("tools", lambda ctx: ctx.tool(Tool("add_one", "Add one to an integer",
+            {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}, lambda n: n + 1))))
+        chunks = []
+        try:
+            result = await app.arun("Calculate 2 plus 1 using add_one.", stream=chunks.append if streaming else None)
+            assert result and any(m["role"] == "tool" and m["content"] == "3" for m in app.messages)
+            if streaming:
+                assert chunks
+        finally:
+            await app.aclose()
+            await backend.aclose()
+    asyncio.run(scenario())
