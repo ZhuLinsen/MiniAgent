@@ -28,6 +28,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+from pathlib import Path
+import json
+import shlex
 
 # Global skill registry
 _SKILLS: Dict[str, "Skill"] = {}
@@ -68,6 +71,31 @@ def get_skill(name: str) -> Optional[Skill]:
 def list_skills() -> List[str]:
     """Return names of all registered skills."""
     return list(_SKILLS.keys())
+
+
+def read_skill(path):
+    """Read trusted local SKILL.md; simple scalar frontmatter and tool lists only."""
+    file = Path(path)
+    if file.is_dir():
+        file = file / "SKILL.md"
+    text = file.read_text(encoding="utf-8")
+    meta, prompt = {}, text
+    if text.startswith("---\n"):
+        pieces = text.split("---\n", 2)
+        if len(pieces) != 3:
+            raise ValueError("Unclosed Skill frontmatter")
+        for line in pieces[1].splitlines():
+            key, separator, value = line.partition(":")
+            if separator:
+                meta[key.strip()] = value.strip().strip("\"'")
+        prompt = pieces[2]
+    tools = meta.get("allowed-tools", meta.get("tools"))
+    if tools is not None:
+        tools = json.loads(tools) if tools.startswith("[") else shlex.split(tools)
+        if not isinstance(tools, list) or not all(isinstance(t, str) for t in tools):
+            raise ValueError("Skill tools must be a list of names")
+    return Skill(name=meta.get("name", file.parent.name), prompt=prompt.strip(),
+                 tools=tools, description=meta.get("description", ""))
 
 
 # ---------------------------------------------------------------------------

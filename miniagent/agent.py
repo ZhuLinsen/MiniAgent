@@ -264,8 +264,11 @@ If the question is outside the scope of the available tools, use your knowledge 
         if skill.temperature is not None:
             self.temperature = skill.temperature
         # Filter tools to skill whitelist
+        catalog = getattr(self, "_skill_catalog", self.tools)
+        self._skill_catalog = list(catalog)
+        self.tools = list(catalog)
         if skill.tools is not None:
-            self.tools = [t for t in self.tools if t["name"] in skill.tools]
+            self.tools = [t for t in catalog if t["name"] in skill.tools]
             logger.info(f"Skill '{skill_name}' filtered tools to: {[t['name'] for t in self.tools]}")
         
         logger.info(f"Loaded skill: {skill_name}")

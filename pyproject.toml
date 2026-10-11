@@ -54,6 +54,7 @@ Source = "https://github.com/ZhuLinsen/MiniAgent"
 miniagent = "miniagent.cli:main"
 
 [project.optional-dependencies]
+mcp = ["mcp==2.3.0"]
 docx = [
     "python-docx>=0.8.11",
 ]

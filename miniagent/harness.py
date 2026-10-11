@@ -56,10 +56,26 @@ class Harness:
         self.messages = []
         self.busy = False
         self.session, self.context_budget = session, context_budget
+        self._base_prompt = system_prompt
+        self._base_temperature = temperature
+        self.skill = None
         if model:
             from .llm import llm_plugin
             self.use(llm_plugin(model, providers=providers, api_key=api_key,
                                 base_url=base_url, temperature=temperature))
+
+    def apply_skill(self, skill=None):
+        self._idle()
+        self.registry.allowed = set(skill.tools) if skill and skill.tools is not None else None
+        self.system_prompt = self._base_prompt + ("\n\n" + skill.prompt if skill else "")
+        self.skill = skill
+        if self.messages:
+            # Prompt is a per-run view; original Session records remain intact.
+            self.messages = [m for m in self.messages if m["role"] != "system"]
+            self.messages.insert(0, {"role": "system", "content": self.system_prompt})
+        backend = self.backend or self.services.get("llm")
+        if backend and hasattr(backend, "temperature"):
+            backend.temperature = skill.temperature if skill and skill.temperature is not None else self._base_temperature
 
     def _idle(self):
         if self.busy:
@@ -148,6 +164,10 @@ class Harness:
                     raise RuntimeError("Session has uncertain tool results; inspect and resolve them first")
                 self.messages = self.session.messages
             await self._start()
+            if self.skill:
+                backend = self.backend or self.services.get("llm")
+                if backend and hasattr(backend, "temperature") and self.skill.temperature is not None:
+                    backend.temperature = self.skill.temperature
             from .agent import agent_loop
             return await agent_loop(self, query, max_steps=max_steps, stream=stream)
         finally:
