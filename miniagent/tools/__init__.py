@@ -82,7 +82,7 @@ def execute_tool(name: str, **kwargs) -> Any:
     Returns:
         Result of the tool execution
     """
-    logger.info(f"Executing tool: {name} with arguments: {kwargs}")
+    logger.info(f"Executing tool: {name}")
     
     tool = get_tool(name)
     if not tool:

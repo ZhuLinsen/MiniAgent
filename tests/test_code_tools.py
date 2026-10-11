@@ -1,6 +1,7 @@
 """Tests for code_tools (read/write/edit/grep/glob/bash)."""
 
 import os
+import sys
 import pytest
 from miniagent.tools.code_tools import read, write, edit, grep, glob, bash
 from miniagent.utils.text_utils import smart_truncate
@@ -86,14 +87,14 @@ class TestBash:
         assert result["exit_code"] != 0
 
     def test_timeout(self, tmp_workspace):
-        result = bash("sleep 10", timeout=1)
+        result = bash(f'"{sys.executable}" -c "import time; time.sleep(10)"', timeout=1)
         assert result["exit_code"] == 1
         assert "timed out" in result["stderr"].lower()
 
     def test_bash_timeout_from_env(self, tmp_workspace, monkeypatch):
         """bash() with timeout=0 should read BASH_TIMEOUT env var."""
         monkeypatch.setenv("BASH_TIMEOUT", "1")
-        result = bash("sleep 10", timeout=0)
+        result = bash(f'"{sys.executable}" -c "import time; time.sleep(10)"', timeout=0)
         assert result["exit_code"] == 1
         assert "timed out" in result["stderr"].lower()
 
