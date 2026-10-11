@@ -53,3 +53,40 @@ def test_mcp_real_stdio_denial_call_cleanup():
         assert not app.registry.tools and not app.services
         assert not psutil.pid_exists(pid)
     asyncio.run(scenario())
+
+
+def test_mcp_payload_cannot_override_approved_remote_name(monkeypatch):
+    mcp = pytest.importorskip("mcp")
+    from types import SimpleNamespace as NS
+    calls = []
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+        async def list_tools(self, cursor=None):
+            schema = {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
+                      "additionalProperties": True}
+            return NS(next_cursor=None, tools=[NS(name=name, description=name, input_schema=schema) for name in ("add", "other")])
+        async def call_tool(self, name, arguments):
+            calls.append((name, arguments))
+            return NS(model_dump=lambda **kwargs: {"structuredContent": {"sum": arguments["a"] + arguments["b"]}})
+    monkeypatch.setattr(mcp, "Client", Client)
+    async def scenario():
+        approvals = []
+        def approve(name, arguments):
+            approvals.append(name)
+            return True
+        app = Harness(policy=Policy(mode="confirm", approve=approve))
+        app.use(mcp_plugin("local", sys.executable, [str(Path(__file__).parent / "fixtures/mcp_server.py")]))
+        async with app:
+            app.registry.allowed = {"local__add"}
+            result = await app.registry.execute("local__add", {"_name": "other", "a": 2, "b": 3}, app.policy)
+            assert result["structuredContent"]["sum"] == 5
+            assert approvals == ["local__add"]
+            assert calls == [("add", {"_name": "other", "a": 2, "b": 3})]
+            with pytest.raises(PermissionError):
+                await app.registry.execute("local__other", {"a": 2, "b": 3}, app.policy)
+    asyncio.run(scenario())

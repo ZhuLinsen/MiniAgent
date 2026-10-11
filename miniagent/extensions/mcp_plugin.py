@@ -38,16 +38,18 @@ def mcp_plugin(name, command, args=(), *, env=None, cwd=None, timeout=30):
         ctx.service(f"mcp:{name}", client)
         cursor = None
         seen = set()
+        def bind(remote_name):
+            async def executor(**arguments):
+                if task.done():
+                    raise ConnectionError("MCP connection is closed")
+                result = await client.call_tool(remote_name, arguments)
+                return result.model_dump(mode="json", exclude_none=True, by_alias=True)
+            return executor
         while True:
             page = await client.list_tools(cursor=cursor)
             for remote in page.tools:
-                async def executor(_name=remote.name, **arguments):
-                    if task.done():
-                        raise ConnectionError("MCP connection is closed")
-                    result = await client.call_tool(_name, arguments)
-                    return result.model_dump(mode="json", exclude_none=True, by_alias=True)
                 ctx.tool(Tool(f"{name}__{remote.name}", remote.description or remote.name,
-                              remote.input_schema, executor, "external"))
+                              remote.input_schema, bind(remote.name), "external"))
             cursor = page.next_cursor
             if cursor is None:
                 break
