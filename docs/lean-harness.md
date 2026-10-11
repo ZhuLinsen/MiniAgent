@@ -35,9 +35,18 @@ Original commit `4d61483d039e802f6d34fb6b42d6e2a99b1b6a1c`: 20 files,
 
 ## Models
 
+Model selection is explicit: CLI `--model` > JSON `llm.model` > `LLM_MODEL`.
+There is no implicit model default. A provider key or API base alone cannot
+select a model; both CLIs fail before client creation when it is missing.
+Credentials are resolved after the final model, including JSON and CLI overrides.
+Unprefixed IDs use OpenAI unless an explicit legacy compatibility endpoint is set;
+prefer `provider:model-id`. `LLM_API_KEY`/`LLM_API_BASE` are intentional gateway
+overrides. Provider-specific keys are never borrowed for an unrelated model.
+
 Python >=3.11; validated SDK: any-llm-sdk 1.33.0. SDK HTTP normalization and
 stream assembly are tested without a remote service. Real DeepSeek/Qwen/Claude
-calls have not been validated without explicit test credentials.
+native calls remain unvalidated; two models have live Anspire gateway evidence
+in [the acceptance report](acceptance-2026-10-11.md).
 Use `Harness(model="provider:model-id")` with the provider's environment key.
 Custom JSON configuration:
 
@@ -148,14 +157,15 @@ are synchronized in Chinese and English; detailed migration remains here.
 
 ## Local acceptance evidence
 
-Windows / Python 3.12: 236 passed, 3 skipped (live provider credentials not
-provided). Real local MCP stdio subprocess discovery/call/cleanup passed.
+Windows / Python 3.12: 249 deterministic tests passed (3 live cases excluded).
+Two selected models separately passed the three live cases via Anspire.
+Real local MCP stdio subprocess discovery/call/cleanup passed.
 New runtime lint (Ruff F checks), compileall, pip check, wheel and sdist build
 passed. Locked dependencies were upgraded after an audit finding; a repeat
 pip-audit reports no known vulnerabilities. CI adds Linux/Python 3.11 checks;
 those results must be read from the PR, not inferred from local Windows tests.
 New core: 521 physical lines; core plus Policy/tool plugin/Session: 823 lines.
-All official package Python: 4,784 lines, including
+All official package Python: 4,770 lines, including
 legacy teaching, optional tools, Reflection and Orchestrator. The 2,800-line
 total budget is not achieved; compatibility removal requires a separate,
 explicitly reviewed migration rather than silently deleting existing APIs.
@@ -169,7 +179,7 @@ two-turn tool calls and response conversion; these are offline protocol tests.
 The opt-in live suite now covers basic replies and multi-turn tool use both with
 and without streaming. Run it separately for each configured provider with
 `MINIAGENT_TEST_MODEL` and `python -m pytest -m live -v`; credentials are never
-printed. No live-provider pass is claimed until those runs actually complete.
+printed. Gateway passes are recorded separately from native-provider coverage.
 
 Every stacked PR has Windows/Linux × Python 3.11/3.12 regression CI. The final
 PR additionally locks dependencies, checks native-runtime Ruff F rules, audits
@@ -182,9 +192,10 @@ content values are hidden. Known Shell/file failures display failed status.
 Logger configuration shares the file-handler implementation (206 → 86 lines),
 preserving its API and cache semantics. Total source remains above the budget.
 
-The v0.3 follow-up requires an explicit compatibility migration for Legacy,
-low-frequency tools and the old text parser; measure installation size/startup
-before and after, validate real provider tasks, then publish an actual task demo.
+The [v0.3 migration proposal](legacy-migration.md) covers Legacy, optional tools
+and the old text parser. Current installation/startup measurements and a real
+read/edit/test demo are in [the acceptance report](acceptance-2026-10-11.md).
+Before/after comparison and native-provider validation remain open.
 Automatic dependency recovery and interactive plugin management remain deferred.
 Review readiness is not a stable-release or complete-plan acceptance claim.
 Merge #6 → #7 → #8 → #9 → #10 → #11; use merge commits to preserve stacked

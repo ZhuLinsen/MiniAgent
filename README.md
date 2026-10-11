@@ -4,7 +4,7 @@
 
 [English](README_EN.md) · [运行与迁移指南](docs/lean-harness.md) · [变更记录](docs/CHANGELOG.md) · [CI](https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml)
 
-需要 **Python 3.11+**。当前版本为 **0.2.0a1**：适合评估新架构和开发插件；真实多模型验收及总体源码精简仍未完成。
+需要 **Python 3.11+**。当前版本为 **0.2.0a1**：适合评估新架构和开发插件；已通过两款模型的 Anspire 网关验收，原厂多 Provider 验收及总体源码精简仍未完成。详见[验收证据](docs/acceptance-2026-10-11.md)。
 
 ## 三步开始
 
@@ -15,6 +15,8 @@ python -m pip install .
 ```
 
 在项目内创建 `.env`，填入自己的 Provider 密钥和模型 ID。下面的 `<model-id>` 必须替换；Qwen 使用 `dashscope:<model-id>` 和 `DASHSCOPE_API_KEY`，Claude 使用 `anthropic:<model-id>` 和 `ANTHROPIC_API_KEY`。
+
+必须显式选择模型；只设置密钥或 API 地址时，CLI 会在创建客户端前提示缺少模型。`--model` 优先于 JSON 中的 `llm.model`，再优先于 `LLM_MODEL`。
 
 ```dotenv
 DEEPSEEK_API_KEY=your-provider-key

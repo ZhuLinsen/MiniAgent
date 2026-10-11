@@ -4,7 +4,7 @@
 
 [中文](README.md) · [Runtime and migration guide](docs/lean-harness.md) · [Changelog](docs/CHANGELOG.md) · [CI](https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml)
 
-Requires **Python 3.11+**. Version **0.2.0a1** is for evaluating the architecture and developing plugins. Live multi-provider acceptance and the total-source reduction target remain incomplete.
+Requires **Python 3.11+**. Version **0.2.0a1** is for evaluating the architecture and developing plugins. Two models passed live Anspire gateway acceptance; native multi-provider acceptance and the total-source reduction target remain incomplete. See the [acceptance evidence](docs/acceptance-2026-10-11.md).
 
 ## Get started
 
@@ -15,6 +15,8 @@ python -m pip install .
 ```
 
 Create `.env` in the project and fill in your provider key and model ID. Replace `<model-id>` below. For Qwen use `dashscope:<model-id>` and `DASHSCOPE_API_KEY`; for Claude use `anthropic:<model-id>` and `ANTHROPIC_API_KEY`.
+
+Select a model explicitly. A key or API URL alone causes the CLI to report a missing model before creating a client. `--model` takes precedence over JSON `llm.model`, then `LLM_MODEL`.
 
 ```dotenv
 DEEPSEEK_API_KEY=your-provider-key

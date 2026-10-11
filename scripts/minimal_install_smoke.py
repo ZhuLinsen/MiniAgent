@@ -1,10 +1,13 @@
 """Install a built wheel without extras and exercise it outside the checkout."""
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import statistics
 import tempfile
+import time
 import venv
 
 SMOKE = '''
@@ -40,6 +43,7 @@ asyncio.run(main())
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--uv", default=shutil.which("uv"))
+    parser.add_argument("--report", type=Path, help="Save measured install size and startup timings as JSON")
     args = parser.parse_args()
     wheels = list((Path(__file__).resolve().parents[1] / "dist").glob("miniagent-*.whl"))
     if not args.uv or len(wheels) != 1:
@@ -48,9 +52,31 @@ def main():
         root = Path(folder)
         venv.EnvBuilder(with_pip=False).create(root / "env")
         python = root / "env" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        started = time.perf_counter()
         subprocess.run([args.uv, "pip", "install", "--python", str(python), str(wheels[0])], check=True)
+        install_seconds = time.perf_counter() - started
         subprocess.run([str(python), "-I", "-c", SMOKE], cwd=root, check=True)
         subprocess.run([str(python), "-I", "-m", "miniagent", "--help"], cwd=root, check=True)
+        measurements = {}
+        for name, command in (("import", ["-c", "import miniagent"]),
+                              ("cli_help", ["-m", "miniagent", "--help"])):
+            samples = []
+            for _ in range(5):
+                started = time.perf_counter()
+                subprocess.run([str(python), "-I", *command], cwd=root, check=True,
+                               stdout=subprocess.DEVNULL)
+                samples.append(round(time.perf_counter() - started, 4))
+            measurements[name] = {"seconds": samples, "median_seconds": statistics.median(samples)}
+        site = root / "env" / ("Lib/site-packages" if os.name == "nt" else
+                               f"lib/python{os.sys.version_info.major}.{os.sys.version_info.minor}/site-packages")
+        report = {"platform": os.sys.platform, "python": os.sys.version.split()[0],
+                  "wheel_bytes": wheels[0].stat().st_size,
+                  "site_packages_bytes": sum(p.stat().st_size for p in site.rglob("*") if p.is_file()),
+                  "install_seconds": round(install_seconds, 4), "startup": measurements}
+        print(json.dumps(report))
+        if args.report:
+            args.report.parent.mkdir(parents=True, exist_ok=True)
+            args.report.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print("Minimal installed-wheel smoke passed (no MCP or legacy extras).")
 
 

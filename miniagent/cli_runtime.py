@@ -27,8 +27,15 @@ def new_session():
 
 async def cli_run(args, *, console=None, backend=None):
     console = console or Console()
-    cfg = load_config(args.config, model_override=args.model, base_override=args.base_url)
-    model = args.model or cfg.llm.model
+    try:
+        cfg = load_config(args.config, model_override=args.model, base_override=args.base_url)
+    except ValueError as error:
+        console.print(Text(f"Configuration error: {error}", style="red"))
+        return 2
+    model = cfg.llm.model
+    if backend is None and not model:
+        console.print(Text("Model is required. Set LLM_MODEL=provider:model-id, llm.model in JSON, or --model provider:model-id. A provider key alone does not select a model.", style="red"))
+        return 2
     def approve(name, arguments):
         if not sys.stdin.isatty():
             return False

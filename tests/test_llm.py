@@ -105,9 +105,9 @@ def test_live_provider():
     if not model:
         pytest.skip("Set MINIAGENT_TEST_MODEL and provider credentials for a live smoke test")
     async def scenario():
-        backend = LLMBackend(model)
+        backend = _live_backend(model)
         try:
-            result = await backend.complete([{"role": "user", "content": "Say hello."}], [])
+            result = await backend.complete([{"role": "user", "content": "Reply only OK."}], [])
             assert result.get("content")
         finally:
             await backend.aclose()
@@ -125,14 +125,14 @@ def test_live_multi_turn_tool_call(streaming):
     if not model:
         pytest.skip("Set MINIAGENT_TEST_MODEL and provider credentials for live tool acceptance")
     async def scenario():
-        backend = LLMBackend(model)
+        backend = _live_backend(model)
         app = Harness(backend, policy=Policy(mode="trusted"), system_prompt=
                       "Use the add_one tool with n=2 before answering. Report the tool result.")
         app.use(Plugin("tools", lambda ctx: ctx.tool(Tool("add_one", "Add one to an integer",
             {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}, lambda n: n + 1))))
         chunks = []
         try:
-            result = await app.arun("Calculate 2 plus 1 using add_one.", stream=chunks.append if streaming else None)
+            result = await app.arun("Calculate 2 plus 1 using add_one.", stream=chunks.append if streaming else None, max_steps=3)
             assert result and any(m["role"] == "tool" and m["content"] == "3" for m in app.messages)
             if streaming:
                 assert chunks
@@ -140,3 +140,15 @@ def test_live_multi_turn_tool_call(streaming):
             await app.aclose()
             await backend.aclose()
     asyncio.run(scenario())
+
+
+def _live_backend(model):
+    """Respect explicit gateway configuration and bound acceptance-test spend."""
+    from functools import partial
+    from miniagent.config import load_config
+    cfg = load_config(model_override=model)
+    backend = LLMBackend(model, providers=cfg.providers, api_key=cfg.llm.api_key,
+                         base_url=cfg.llm.api_base, temperature=0, timeout=30)
+    limits = {"max_completion_tokens": 512} if backend.provider == "openai" else {"max_tokens": 256}
+    backend.client.acompletion = partial(backend.client.acompletion, **limits)
+    return backend

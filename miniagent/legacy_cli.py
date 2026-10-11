@@ -152,12 +152,16 @@ def _status_callback(status_text: str) -> None:
 
 
 def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, model_override=args.model, base_override=args.base_url)
 
-    model = args.model or cfg.llm.model
+    model = cfg.llm.model
     api_key = args.api_key or cfg.llm.api_key
     base_url = args.base_url or cfg.llm.api_base
     temperature = args.temperature if args.temperature is not None else cfg.llm.temperature
+
+    if not model:
+        console.print("[bold red]Missing model: set LLM_MODEL, llm.model in JSON, or --model.[/bold red]")
+        raise SystemExit(2)
 
     if not api_key:
         console.print("[bold red]❌ Missing API Key[/bold red]")

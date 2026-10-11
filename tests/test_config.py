@@ -20,6 +20,7 @@ class TestLoadConfig:
         """LLM_API_KEY not set — should fallback to OPENAI_API_KEY."""
         monkeypatch.delenv("LLM_API_KEY", raising=False)
         monkeypatch.setenv("OPENAI_API_KEY", "openai-fallback-key")
+        monkeypatch.setenv("LLM_MODEL", "openai:fixture-model")
 
         config = load_config()
         assert config.llm.api_key == "openai-fallback-key"
@@ -29,17 +30,19 @@ class TestLoadConfig:
         for key in ("LLM_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY"):
             monkeypatch.delenv(key, raising=False)
         monkeypatch.setenv("GEMINI_API_KEY", "gemini-fallback-key")
+        monkeypatch.setenv("LLM_MODEL", "gemini:fixture-model")
 
         config = load_config()
         assert config.llm.api_key == "gemini-fallback-key"
 
-    def test_google_api_base_sets_default_model(self, monkeypatch):
+    def test_google_api_base_does_not_guess_model(self, monkeypatch):
         monkeypatch.delenv("LLM_MODEL", raising=False)
         monkeypatch.setenv("LLM_API_KEY", "k")
         monkeypatch.setenv("LLM_API_BASE", "https://generativelanguage.googleapis.com/v1beta/openai/")
 
         config = load_config()
-        assert config.llm.model == "gemini-2.5-flash"
+        assert config.llm.model == ""
+        assert config.llm.api_key is None
 
     def test_default_values(self, monkeypatch):
         """With minimal env, config should still load with defaults."""
