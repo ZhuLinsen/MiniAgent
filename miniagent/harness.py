@@ -38,10 +38,11 @@ class Scope:
         self.stack.callback(listeners.remove, callback)
 
     def cleanup(self, callback, *args):
-        if inspect.iscoroutinefunction(callback):
-            self.stack.push_async_callback(callback, *args)
-        else:
-            self.stack.callback(callback, *args)
+        async def invoke():
+            result = callback(*args)
+            if inspect.isawaitable(result):
+                await result
+        self.stack.push_async_callback(invoke)
 
 
 class Harness:
@@ -90,7 +91,11 @@ class Harness:
 
     async def start(self):
         self._idle()
-        await self._start()
+        self.busy = True
+        try:
+            await self._start()
+        finally:
+            self.busy = False
 
     async def _start(self):
         pending = {n: p for n, p in self.plugins.items() if n not in self.active}
@@ -127,10 +132,14 @@ class Harness:
         self._idle()
         if any(name in self.plugins[n].requires for n in self.active if n != name):
             raise ValueError("Plugin has active dependents")
-        scope = self.active.pop(name, None)
-        if scope:
-            await scope.stack.aclose()
-        self.plugins.pop(name)
+        self.busy = True
+        try:
+            scope = self.active.pop(name, None)
+            if scope:
+                await scope.stack.aclose()
+            self.plugins.pop(name)
+        finally:
+            self.busy = False
 
     async def emit(self, event, **payload):
         for callback in tuple(self.events.get(event, ())):
@@ -145,14 +154,18 @@ class Harness:
 
     async def aclose(self):
         self._idle()
-        errors = []
-        for name in reversed(tuple(self.active)):
-            try:
-                await self.active.pop(name).stack.aclose()
-            except BaseException as error:
-                errors.append(error)
-        if errors:
-            raise BaseExceptionGroup("Plugin cleanup failures", errors)
+        self.busy = True
+        try:
+            errors = []
+            for name in reversed(tuple(self.active)):
+                try:
+                    await self.active.pop(name).stack.aclose()
+                except BaseException as error:
+                    errors.append(error)
+            if errors:
+                raise BaseExceptionGroup("Plugin cleanup failures", errors)
+        finally:
+            self.busy = False
 
     async def arun(self, query, *, max_steps=10, stream=None):
         self._idle()

@@ -42,6 +42,7 @@ class AgentConfig:
     system_prompt: str = "You are a helpful AI assistant."
     default_tools: List[str] = field(default_factory=list)
     providers: Dict[str, Any] = field(default_factory=dict)
+    mcp_servers: Dict[str, Any] = field(default_factory=dict)
     enable_reflection: bool = False
     reflection_system_prompt: Optional[str] = None
     reflection_max_iterations: int = 3
@@ -54,7 +55,7 @@ class AgentConfig:
     context_budget: int = 32768     # MINIAGENT_CONTEXT_BUDGET: conservative token budget
     confirm_dangerous: bool = True   # CONFIRM_DANGEROUS: require confirmation for dangerous commands
 
-def load_config(config_path: Optional[str] = None) -> AgentConfig:
+def load_config(config_path: Optional[str] = None, *, model_override=None, base_override=None) -> AgentConfig:
     """
     Load configuration from file
     
@@ -69,8 +70,8 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
     
     # Explicit compatibility credentials belong to the selected endpoint.
     config.llm.api_key = os.environ.get("LLM_API_KEY")
-    config.llm.api_base = os.environ.get("LLM_API_BASE")
-    model = os.environ.get("LLM_MODEL", "")
+    config.llm.api_base = base_override or os.environ.get("LLM_API_BASE")
+    model = model_override or os.environ.get("LLM_MODEL", "")
     aliases = {
         "openai": ("OPENAI_API_KEY", "OPENAI_API_BASE"),
         "deepseek": ("DEEPSEEK_API_KEY", "DEEPSEEK_API_BASE"),
@@ -104,7 +105,7 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
         config.llm.organization = env_organization
         
     # Try to get model from environment variables
-    env_model = os.environ.get("LLM_MODEL")
+    env_model = model_override or os.environ.get("LLM_MODEL")
     if env_model:
         config.llm.model = env_model
     
@@ -165,8 +166,19 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
             if key != "llm" and hasattr(config, key):
                 setattr(config, key, value)
                 
+        if model_override:
+            config.llm.model = model_override
+        if base_override:
+            config.llm.api_base = base_override
+        explicit_key = config_data.get("llm", {}).get("api_key") or os.environ.get("LLM_API_KEY")
+        if ":" in config.llm.model and not explicit_key:
+            selected = config.llm.model.partition(":")[0]
+            key_name = aliases.get(selected, (selected.upper() + "_API_KEY", None))[0]
+            config.llm.api_key = os.environ.get(key_name) if selected not in config.providers else None
+            # A prior provider's endpoint must not leak into the selected client.
+            config.llm.api_base = base_override or config_data.get("llm", {}).get("api_base") or os.environ.get("LLM_API_BASE")
         logger.info(f"Configuration loaded from {config_path}")
     except Exception as e:
-        logger.error(f"Failed to load configuration from {config_path}: {e}")
+        raise ValueError(f"Failed to load configuration from {config_path}") from e
         
     return config

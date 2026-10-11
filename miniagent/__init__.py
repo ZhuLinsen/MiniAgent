@@ -1,19 +1,13 @@
-"""MiniAgent - A lightweight Agent framework.
-
-Core classes are eagerly imported so ``dir(miniagent)`` and IDE
-auto-complete work out of the box.  Extensions (MCP, Orchestrator)
-are lazily loaded to keep ``import miniagent`` fast.
-"""
+"""MiniAgent: eager Harness/Skills exports; legacy and extensions load on demand."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from .agent import MiniAgent
 from .harness import Harness, Plugin
 from .skills import Skill, register_skill, get_skill, list_skills
 
-__version__ = "0.1.0"
+__version__ = "0.2.0a1"
 
 __all__ = [
     "MiniAgent",
@@ -31,6 +25,9 @@ __all__ = [
 
 # Extensions stay lazy — they pull in heavier deps
 def __getattr__(name: str) -> Any:
+    if name == "MiniAgent":
+        from .legacy import MiniAgent
+        return MiniAgent
     if name == "Orchestrator":
         from .orchestrator import Orchestrator
         return Orchestrator

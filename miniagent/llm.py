@@ -7,6 +7,17 @@ from any_llm import AnyLLM
 from .harness import Plugin
 
 
+def merge_metadata(target, source):
+    """Merge provider deltas, preserving signed reasoning/tool-call metadata."""
+    for key, value in source.items():
+        if isinstance(value, dict):
+            merge_metadata(target.setdefault(key, {}), value)
+        elif isinstance(value, str) and isinstance(target.get(key), str):
+            target[key] += value
+        else:
+            target[key] = value
+
+
 class LLMBackend:
     def __init__(self, model, *, providers=None, api_key=None, base_url=None,
                  temperature=None, timeout=60, client=None):
@@ -56,8 +67,10 @@ class LLMBackend:
         self.usage = {}
         if stream is None:
             self.usage = response.usage.model_dump() if response.usage else {}
-            return response.choices[0].message.model_dump(exclude_none=True)
-        content, calls, reasoning, finish = [], {}, [], None
+            if response.choices[0].finish_reason not in {"stop", "tool_calls"}:
+                raise RuntimeError("Incomplete LLM response; no tools executed")
+            return response.choices[0].message.model_dump(exclude_none=True, mode="json")
+        content, calls, reasoning, metadata, finish = [], {}, [], {}, None
         try:
             async for chunk in response:
                 if chunk.usage:
@@ -74,6 +87,11 @@ class LLMBackend:
                         await result
                 if getattr(delta, "reasoning_content", None):
                     reasoning.append(delta.reasoning_content)
+                trace = getattr(delta, "reasoning", None)
+                if trace and trace.content:
+                    reasoning.append(trace.content)
+                if getattr(delta, "extra_content", None):
+                    merge_metadata(metadata, delta.extra_content)
                 for part in delta.tool_calls or []:
                     call = calls.setdefault(part.index, {"id": "", "type": "function",
                         "function": {"name": "", "arguments": ""}})
@@ -82,6 +100,8 @@ class LLMBackend:
                     if part.function:
                         for field in ("name", "arguments"):
                             call["function"][field] += getattr(part.function, field) or ""
+                    if getattr(part, "extra_content", None):
+                        merge_metadata(call.setdefault("extra_content", {}), part.extra_content)
             if finish not in {"stop", "tool_calls"}:
                 raise RuntimeError("Incomplete LLM stream; no tools executed")
             result = {"role": "assistant", "content": "".join(content) or None}
@@ -94,6 +114,8 @@ class LLMBackend:
                 result["tool_calls"] = ordered
             if reasoning:
                 result["reasoning_content"] = "".join(reasoning)
+            if metadata:
+                result["extra_content"] = metadata
             return result
         finally:
             close = getattr(response, "aclose", None)

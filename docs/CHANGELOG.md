@@ -12,3 +12,5 @@
 - [新功能] any-llm 异步模型适配、自定义 Provider、完整流式工具组装及 Provider 密钥隔离。
 - [新功能] 简化 SKILL.md 读取与可恢复工具白名单，官方 MCP 2.3 stdio 插件。
 - [改进] 移除手写 MCP 传输；旧隐式进程 API 明确提示迁移到生命周期插件。
+- [改进] 默认 CLI 迁移到 Harness，增加会话、模型、插件和 Skill 命令；旧教学 CLI 通过 --legacy 使用。
+- [测试] 增加 Windows/Linux 锁定依赖 CI、MCP 子进程集成、流式签名和 CLI 回归。

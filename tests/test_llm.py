@@ -1,7 +1,7 @@
 import asyncio
 import json
 from types import SimpleNamespace as NS
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -70,6 +70,23 @@ def test_custom_provider_does_not_use_openai_key(monkeypatch):
     with pytest.raises(ValueError, match="CUSTOM_KEY"):
         LLMBackend("custom:test", providers={"custom": {
             "type": "openai-compatible", "base_url": "https://test.invalid/v1", "api_key_env": "CUSTOM_KEY"}})
+
+
+def test_stream_preserves_signed_provider_metadata():
+    async def chunks():
+        yield NS(usage=None, choices=[NS(finish_reason=None, delta=NS(content=None,
+            reasoning=NS(content="reason"), extra_content={"anthropic": {"signature": "sig"}},
+            tool_calls=[NS(index=0, id="one", function=NS(name="add", arguments="{}"),
+                           extra_content={"google": {"thought_signature": "opaque"}})]))])
+        yield NS(usage=None, choices=[NS(finish_reason="tool_calls", delta=NS(content=None,
+            extra_content={"anthropic": {"signature": "nature"}}, tool_calls=[]))])
+    async def scenario():
+        backend = LLMBackend("mock:test", client=NS(acompletion=AsyncMock(return_value=chunks())))
+        result = await backend.complete([], [], lambda text: None)
+        assert result["reasoning_content"] == "reason"
+        assert result["extra_content"]["anthropic"]["signature"] == "signature"
+        assert result["tool_calls"][0]["extra_content"]["google"]["thought_signature"] == "opaque"
+    asyncio.run(scenario())
 
 
 def test_provider_resolution_isolated(monkeypatch):

@@ -1,5 +1,7 @@
 # MiniAgent
 
+> **v0.2 alpha source preview (Python >=3.11)**: The default CLI uses the async Harness, native tool calls and JSONL sessions. Install from source with `python -m pip install -e ".[mcp]"`, configure the selected provider key, then run `miniagent --model provider:model-id --policy readonly --prompt "Inspect this project"`. Writes, shell and MCP require confirmation by default; noninteractive approval denies execution. Explicit trusted execution uses `--policy trusted`. Use `miniagent --legacy` for the teaching CLI. See the [Harness migration guide](docs/lean-harness.md). Live multi-provider acceptance and the total-source reduction target remain incomplete.
+
 🚀 **Build an AI Coding Assistant + CLI-based Manus in 5 Minutes!** | [中文版本](README.md)
 
 <div align="center">

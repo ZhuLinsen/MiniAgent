@@ -95,3 +95,50 @@ owner task to close its context in the same task that entered it.
 Discovery failure rolls back tools/services; unload closes the process.
 Old MCPClient and load_mcp_tools APIs fail with an actionable migration message.
 Streamable HTTP is deferred.
+
+## CLI and compatibility
+
+Source install: `python -m pip install -e ".[mcp]"` (Python >=3.11).
+The native Harness is now the default CLI. Use provider:model-id and the selected
+provider credential; config files accept llm, providers and mcp_servers.
+An MCP entry has command (executable), args (list), and optional env (mapping).
+CLI: --workspace, --policy readonly|confirm|trusted, --session <JSONL path>,
+--skill <name|SKILL.md path>, --prompt, --no-stream.
+Existing Session files resume automatically. Without --session a new file is
+created under MINIAGENT_HOME/sessions. Non-TTY uses plain literal text; NO_COLOR
+is honored. /plugins lists active plugins; /skills changes the execution view;
+/session shows uncertain calls; /session resolve ID verified-result resolves
+one manually after inspection; /session new starts a fresh task history.
+/model provider:model-id re-evaluates credentials and starts a new Session to
+avoid replaying provider-specific reasoning metadata across models.
+
+`miniagent --legacy` retains the text teaching CLI. MiniAgent remains a
+compatibility import; its native mode delegates to the same loop. Legacy APIs
+retain their prior permission behavior and are not the new policy boundary.
+Native iteration exhaustion now raises instead of returning a tool result as
+an answer. Legacy Reflection and long-term Memory are not part of Harness.
+No automated dependency recovery, Subagent or remote control plane is added.
+
+The release is 0.2.0a1, not a stable v0.3. Original optional tools and teaching
+compatibility modules remain for migration, so the total-source budget is not
+met. Core and total counts are reported separately by scripts/source_stats.py.
+No line count claim is made for installed third-party dependencies.
+CI covers Windows/Linux with Python 3.11/3.12 and the locked MCP extra. Merge
+PRs 1 through 6 in order; revert in reverse order. No release tag is created.
+
+Optional basic/system tools now require `miniagent[legacy]` and explicit loading.
+The default runtime does not import legacy parsers or Reflection. README changes
+are synchronized in Chinese and English; detailed migration remains here.
+
+## Local acceptance evidence
+
+Windows / Python 3.12: 219 passed, 1 skipped (live provider credentials not
+provided). Real local MCP stdio subprocess discovery/call/cleanup passed.
+New runtime lint (Ruff F checks), compileall, pip check, wheel and sdist build
+passed. Locked dependencies were upgraded after an audit finding; a repeat
+pip-audit reports no known vulnerabilities. CI adds Linux/Python 3.11 checks;
+those results must be read from the PR, not inferred from local Windows tests.
+New core: 470 physical lines. All official package Python: 4,808 lines, including
+legacy teaching, optional tools, Reflection and Orchestrator. The 2,800-line
+total budget is not achieved; compatibility removal requires a separate,
+explicitly reviewed migration rather than silently deleting existing APIs.

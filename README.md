@@ -1,5 +1,7 @@
 # MiniAgent
 
+> **v0.2 alpha 源码预览（Python >=3.11）**：默认 CLI 使用异步 Harness、原生工具调用和 JSONL 会话。源码安装：`python -m pip install -e ".[mcp]"`。使用 `miniagent --model provider:model-id --policy readonly --prompt "检查当前项目结构"`，配置对应 Provider 的环境密钥。文件修改、Shell 和 MCP 默认需要确认；非交互模式默认拒绝，显式信任执行使用 `--policy trusted`。旧教学 CLI 使用 `miniagent --legacy`。完整迁移、权限和验收边界见 [Harness 指南](docs/lean-harness.md)。这仍是 alpha，真实多模型验收和总体源码精简尚未完成。
+
 🚀 **5分钟手搓一个 AI Coding 助手 + 命令行版 Manus！** | [English](README_EN.md)
 
 <div align="center">
