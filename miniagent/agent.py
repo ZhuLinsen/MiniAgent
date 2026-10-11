@@ -442,7 +442,6 @@ If the question is outside the scope of the available tools, use your knowledge 
             if not self.api_key:
                 raise ValueError("API key is not set. Please check your environment variables.")
 
-            logger.debug(f"Calling LLM with API key: {self.api_key[:6]}...")
             logger.debug(f"Base URL: {self.base_url or 'default OpenAI'}")
             logger.debug(f"Model: {self.model}")
             
@@ -649,7 +648,7 @@ If the question is outside the scope of the available tools, use your knowledge 
         if status_callback:
             status_callback(f"Executing tool: {tool_call['name']}...")
         
-        logger.info(f"Executing tool: {tool_call['name']} with args: {tool_call['arguments']}")
+        logger.info(f"Executing tool: {tool_call['name']}")
         result = self._execute_tool(tool_call, tool_callback=tool_callback)
         return smart_truncate(str(result), limit), False
     

@@ -199,7 +199,7 @@ def _build_agent(args: argparse.Namespace) -> tuple[MiniAgent, Memory]:
 
     # Load some default tools if configured, else fall back to all currently registered.
     agent.tools = []
-    tools = cfg.default_tools or agent.get_available_tools()
+    tools = cfg.default_tools or ["read", "write", "edit", "grep", "glob", "bash"]
     for tool_name in tools:
         agent.load_builtin_tool(tool_name)
 
@@ -292,10 +292,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 console.print(f"  [cyan]{t['name']:<18}[/cyan] {desc}")
             continue
 
+        query = _format_history(history) + user_text
         history.append({"role": "user", "content": user_text})
         memory.push("user", user_text)
-
-        query = _format_history(history) + user_text
         
         # Prepare streaming callback
         _stream_chunks: List[str] = []
