@@ -24,6 +24,9 @@ extra or configure an explicitly supplied compatible endpoint.
 This menu is not a claim that every provider has passed live acceptance.
 
 Keys are entered with hidden input. A blank key keeps the existing credential.
+The provider menu shows one friendly name and identifier per numbered row.
+Gemini accepts either `GEMINI_API_KEY` or `GOOGLE_API_KEY`; entered keys use the
+canonical `GEMINI_API_KEY` vault account. Older combined-name accounts remain readable.
 Model discovery uses the SDK's `alist_models()`, bounded to 10 seconds and 200
 displayed IDs; the temporary client is closed. Unavailable/unsupported discovery
 falls back to manual model ID entry. A successful listing is not proof of
@@ -56,6 +59,9 @@ still requires that file; `/models` remembers model IDs, not a copy of arbitrary
 and custom `providers` (`type`, `base_url`, `api_key_env`). It is replaced atomically.
 Malformed profiles fail visibly without being overwritten. Concurrent configuration
 is last-writer-wins; run one setup at a time. Keys are never written to this file.
+Both `/connect` and `/models` reject a known selected-provider key accidentally
+entered as metadata before replacing the profile. An absolute `MINIAGENT_HOME`
+works even when the service/container has no resolvable OS user home directory.
 
 Install optional OS credential support with:
 

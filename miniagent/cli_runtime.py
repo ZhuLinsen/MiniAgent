@@ -49,7 +49,7 @@ async def cli_run(args, *, console=None, backend=None):
         except (EOFError, KeyboardInterrupt):
             return 130
         except Exception as error:
-            console.print(Text(f"Configuration failed: {type(error).__name__}", style="red"))
+            console.print(Text(f"Configuration failed: {error_text(error, cfg.llm.api_key, args.api_key)}", style="red"))
             return 2
     elif backend is None and needs_config:
         console.print(Text("Model is required. Set LLM_MODEL=provider:model-id, llm.model in JSON, or --model provider:model-id. A provider key alone does not select a model." if not model else

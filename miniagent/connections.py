@@ -20,7 +20,8 @@ _secrets = {}
 
 
 def home():
-    return Path(os.environ.get("MINIAGENT_HOME", str(Path.home() / ".miniagent"))).expanduser()
+    configured = os.environ.get("MINIAGENT_HOME")
+    return Path(configured).expanduser() if configured else Path.home() / ".miniagent"
 
 
 def read_profiles():
@@ -81,12 +82,14 @@ def _validate(data):
             raise ValueError("Invalid credential environment variable")
 
 
-def save_model(provider, model, entry=None):
+def save_model(provider, model, entry=None, *, key=None):
     data = read_profiles()
     data["model"] = f"{_identifier(provider)}:{_model(model)}"
     data["models"][provider] = list(dict.fromkeys([model, *data["models"].get(provider, [])]))
     if entry:
         data["providers"][provider] = entry
+    if key and key in json.dumps(data):
+        raise ValueError("Credential must not appear in connection metadata")
     _validate(data)
     path = home() / "connections.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -115,13 +118,22 @@ def _vault():
 
 
 def credential(env, *, persisted=False):
-    value = _secrets.get(env) or os.environ.get(env)
-    if value or not persisted:
-        return value
-    try:
-        return _vault().get_password("miniagent", env)
-    except Exception:
-        return None
+    names = env.split("/")
+    for source in (_secrets, os.environ):
+        for name in names:
+            if source.get(name):
+                return source[name]
+    if persisted:
+        try:
+            vault = _vault()
+            # The combined account was used by older profiles; read it as a fallback.
+            for name in dict.fromkeys([*names, env]):
+                value = vault.get_password("miniagent", name)
+                if value:
+                    return value
+        except Exception:
+            pass
+    return None
 
 
 def error_text(error, *keys):
@@ -134,6 +146,7 @@ def error_text(error, *keys):
 
 
 def store_credential(env, value):
+    env = env.split("/")[0]
     _secrets[env] = value
     try:
         _vault().set_password("miniagent", env, value)
@@ -142,10 +155,11 @@ def store_credential(env, value):
         return False
 
 
-def choose(console, title, values):
+def choose(console, title, values, *, labels=None):
     values = list(dict.fromkeys(values))
     for index, value in enumerate(values, 1):
-        console.print(Text(f"{index:02d}  {value}"))
+        label = (labels or {}).get(value, value)
+        console.print(Text(f"{index:02d}  {label}" + (f" · {value}" if label != value else "")))
     answer = Prompt.ask(title, console=console).strip()
     if answer.isdigit() and 1 <= int(answer) <= len(values):
         return values[int(answer) - 1]
@@ -169,8 +183,9 @@ async def discover(console, provider, *, providers, api_key=None, base_url=None)
 async def connect(console, cfg):
     profiles = read_profiles()
     names = [*PROVIDERS, "custom"]
-    console.print(Text("Model provider: " + ", ".join(f"{p} ({label})" for p, label in PROVIDERS.items())))
-    provider = _identifier(choose(console, "Provider number or name", names))
+    console.print(Text("Connect a model provider", style="bold"))
+    provider = _identifier(choose(console, "Provider number or name", names,
+        labels={**PROVIDERS, "custom": "Custom OpenAI-compatible API"}))
     entry = None
     if provider == "custom":
         provider = _identifier(Prompt.ask("Provider name", console=console).strip())
@@ -194,9 +209,7 @@ async def connect(console, cfg):
         providers[provider] = entry
     models = await discover(console, provider, providers=providers, api_key=key)
     model = _model(choose(console, "Model number or ID", models))
-    if key in json.dumps({"provider": provider, "model": model, "entry": entry}):
-        raise ValueError("Credential must not appear in connection metadata")
-    save_model(provider, model, entry)
+    save_model(provider, model, entry, key=key)
     if supplied:
         saved = store_credential(env, key)
         console.print(Text("Key saved in OS credential store." if saved else
@@ -221,5 +234,5 @@ async def select_model(console, cfg):
                             base_url=cfg.llm.api_base if provider == current else None)
     models = list(dict.fromkeys([*models, *profiles["models"].get(provider, [])]))
     model = _model(choose(console, "Model number or ID", models))
-    save_model(provider, model)
+    save_model(provider, model, key=key)
     return f"{provider}:{model}"
