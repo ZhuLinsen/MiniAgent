@@ -217,3 +217,93 @@ def test_credential_cannot_be_saved_as_a_model(monkeypatch, console):
     with pytest.raises(ValueError, match="Credential must not appear"):
         asyncio.run(c.connect(console, load_config()))
     assert not (c.home() / "connections.json").exists()
+
+
+@pytest.mark.parametrize("env", ["GEMINI_API_KEY", "GOOGLE_API_KEY"])
+def test_gemini_connect_keeps_existing_alias_and_models_reuses_it(monkeypatch, console, env):
+    for name in ("LLM_API_KEY", "LLM_MODEL", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(env, "gemini-fixture-secret")
+    monkeypatch.setattr(c.AnyLLM, "get_provider_class", lambda name: NS(
+        ENV_API_KEY_NAME="GEMINI_API_KEY/GOOGLE_API_KEY"))
+    listing = AsyncMock(return_value=[])
+    monkeypatch.setattr(c, "discover", listing)
+    answers(monkeypatch, ["gemini", "", "first"])
+    assert asyncio.run(c.connect(console, load_config())) == "gemini:first"
+    assert load_config().llm.api_key == "gemini-fixture-secret"
+    answers(monkeypatch, ["gemini", "second"])
+    assert asyncio.run(c.select_model(console, load_config())) == "gemini:second"
+    assert listing.call_args.kwargs["api_key"] == "gemini-fixture-secret"
+
+
+def test_gemini_typed_key_survives_restart_in_canonical_vault_account(monkeypatch, console):
+    for name in ("LLM_API_KEY", "LLM_MODEL", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    stored = {}
+    vault = NS(set_password=lambda service, name, value: stored.update({name: value}),
+               get_password=lambda service, name: stored.get(name))
+    monkeypatch.setattr(c, "_vault", lambda: vault)
+    monkeypatch.setattr(c.AnyLLM, "get_provider_class", lambda name: NS(
+        ENV_API_KEY_NAME="GEMINI_API_KEY/GOOGLE_API_KEY"))
+    monkeypatch.setattr(c, "discover", AsyncMock(return_value=[]))
+    answers(monkeypatch, ["gemini", "new-gemini-secret", "selected"])
+    asyncio.run(c.connect(console, load_config()))
+    assert stored == {"GEMINI_API_KEY": "new-gemini-secret"}
+    c._secrets.clear()
+    assert load_config().llm.api_key == "new-gemini-secret"
+    assert "new-gemini-secret" not in (c.home() / "connections.json").read_text()
+    assert "new-gemini-secret" not in console.file.getvalue()
+
+
+def test_models_rejects_credential_without_changing_saved_profile(monkeypatch, console):
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_MODEL", "deepseek:original")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "fixture-private-secret")
+    c.save_model("deepseek", "original")
+    path = c.home() / "connections.json"
+    before = path.read_bytes()
+    monkeypatch.setattr(c, "discover", AsyncMock(return_value=[]))
+    answers(monkeypatch, ["deepseek", "fixture-private-secret"])
+    with pytest.raises(ValueError, match="Credential must not appear"):
+        asyncio.run(c.select_model(console, load_config()))
+    assert path.read_bytes() == before
+    assert "fixture-private-secret" not in console.file.getvalue()
+
+
+def test_explicit_home_does_not_require_system_home(monkeypatch, tmp_path):
+    explicit = tmp_path / "explicit-home"
+    monkeypatch.setenv("MINIAGENT_HOME", str(explicit))
+    monkeypatch.setattr(c.Path, "home", Mock(side_effect=RuntimeError("No system home")))
+    assert c.home() == explicit
+    c.save_model("deepseek", "fixture")
+    assert load_config().llm.model == "deepseek:fixture"
+
+
+def test_gemini_legacy_combined_vault_account_still_loads(monkeypatch):
+    for name in ("LLM_API_KEY", "LLM_MODEL", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    c.save_model("gemini", "fixture")
+    vault = NS(get_password=lambda service, name:
+               "legacy-fixture-secret" if name == "GEMINI_API_KEY/GOOGLE_API_KEY" else None)
+    monkeypatch.setattr(c, "_vault", lambda: vault)
+    assert load_config().llm.api_key == "legacy-fixture-secret"
+
+
+def test_configuration_failure_keeps_actionable_reason_without_key(monkeypatch, tmp_path, console):
+    from miniagent import cli_runtime
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setenv("LLM_API_KEY", "fixture-private-secret")
+    monkeypatch.setattr(cli_runtime, "connect", AsyncMock(side_effect=ValueError(
+        "Set GEMINI_API_KEY; rejected fixture-private-secret")))
+    assert asyncio.run(cli_runtime.cli_run(options(tmp_path, connect=True), console=console)) == 2
+    text = console.file.getvalue()
+    assert "Set GEMINI_API_KEY" in text and "fixture-private-secret" not in text
+
+
+def test_provider_menu_has_friendly_rows_without_color(console):
+    from unittest.mock import patch
+    with patch.object(c.Prompt, "ask", return_value="2"):
+        assert c.choose(console, "Provider", ["deepseek", "dashscope"], labels=c.PROVIDERS) == "dashscope"
+    text = console.file.getvalue()
+    assert "01  DeepSeek · deepseek" in text and "02  Qwen / DashScope · dashscope" in text
+    assert "\x1b[" not in text

@@ -77,7 +77,7 @@ def load_config(config_path: Optional[str] = None, *, model_override=None, base_
         "openai": ("OPENAI_API_KEY", "OPENAI_API_BASE"),
         "deepseek": ("DEEPSEEK_API_KEY", "DEEPSEEK_API_BASE"),
         "dashscope": ("DASHSCOPE_API_KEY", "DASHSCOPE_API_BASE"),
-        "gemini": ("GEMINI_API_KEY", "GEMINI_API_BASE"),
+        "gemini": ("GEMINI_API_KEY/GOOGLE_API_KEY", "GEMINI_API_BASE"),
         "anthropic": ("ANTHROPIC_API_KEY", "ANTHROPIC_API_BASE"),
         "azure": ("AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"),
     }
@@ -140,8 +140,6 @@ def load_config(config_path: Optional[str] = None, *, model_override=None, base_
         key, base = aliases.get(provider, (provider.upper() + "_API_KEY", None))
         config.llm.api_key = config.llm.api_key or credential(key, persisted=persisted)
         config.llm.api_base = config.llm.api_base or (os.environ.get(base) if base else None)
-        if provider == "gemini":
-            config.llm.api_key = config.llm.api_key or os.environ.get("GOOGLE_API_KEY")
     return config
 
 
