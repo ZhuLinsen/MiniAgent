@@ -1,305 +1,88 @@
 # MiniAgent
 
-🚀 **5分钟手搓一个 AI Coding 助手 + 命令行版 Manus！** | [English](README_EN.md)
+**小内核，实用 Agent。** 一个以插件为核心的 Python Agent Harness，组合模型、工具、Skills、MCP 和可恢复会话。
 
-<div align="center">
-  <img src="resource/miniagent.png" alt="MiniAgent" width="400"/>
+[English](README_EN.md) · [运行与迁移指南](docs/lean-harness.md) · [变更记录](docs/CHANGELOG.md) · [CI](https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml)
 
-  [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-  [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://python.org)
-  [![GitHub stars](https://img.shields.io/github/stars/ZhuLinsen/MiniAgent?style=social)](https://github.com/ZhuLinsen/MiniAgent)
-</div>
+需要 **Python 3.11+**。当前版本为 **0.2.0a1**：适合评估新架构和开发插件；已通过两款模型的 Anspire 网关验收，原厂多 Provider 验收及总体源码精简仍未完成。详见[验收证据](docs/acceptance-2026-10-11.md)。
 
-## 💡 核心特性
-
-**一个 `agent.py` 核心文件，复刻 Claude Code 的编程能力 + Manus 的系统操控能力！**
-
-MiniAgent 是一个**极简、透明、强大的 CLI Agent 框架**，拒绝臃肿的依赖和复杂的架构：
-
-- 🧠 **Code Agent**: 像 Claude Code 一样写代码、修 Bug、跑测试
-- 🦾 **OS Agent**: 像 Manus 一样操控浏览器、编辑文档、管理应用
-- ⚡ **极简实现**: 核心引擎 `agent.py` 完全透明可控，适合学习和魔改
-- 🤖 **全模型支持**: DeepSeek、OpenAI、Gemini、Claude 等所有兼容 OpenAI 接口的模型
-- 🔌 **高扩展性**: 极简装饰器模式，3行代码即可挂载自定义工具
-- 🔄 **双模式工具调用**: 文本解析模式（透明可学习）+ 原生 Function Calling 模式（更可靠）
-- 🎯 **Skill 系统**: 可复用的 Agent 配置，内置 coder/researcher/reviewer/tester 四个角色
-- 🛡️ **安全防护**: 危险命令自动拦截确认，防止 LLM 幻觉导致破坏性操作
-- 💬 **流式输出**: 打字机效果实时输出，长对话自动压缩上下文
-- 🔗 **MCP 协议**: 支持连接 MCP 工具服务器，接入社区生态
-- 🤝 **Agent 编排**: 内置编排器，支持任务分解 + 多角色协同
-
-## 🤔 Why MiniAgent?
-
-| | MiniAgent | smolagents | pydantic-ai | LangChain |
-|---|---|---|---|---|
-| **核心定位** | CLI Agent 教科书 | HuggingFace 生态 | 企业级类型安全 | 万能框架 |
-| **核心代码** | 单文件可读 | ~1,000行 | 182MB | 10万+行 |
-| **工具调用** | 文本解析 + 原生FC | Code Agent | 原生FC | 多层抽象 |
-| **学习曲线** | ⭐ 30分钟上手 | ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| **依赖** | 7个 | ~20个 | ~15个 | 50+ |
-| **OS 控制** | bash 万能 | 需扩展 | 需扩展 | 需插件 |
-
-> **MiniAgent 的独特价值：最好的 AI Agent 教科书。** 没有魔法、没有抽象，初学者可以完全理解 Agent 是如何工作的。
-
-## 设计哲学
-
-> **MiniAgent 不内置 100 个工具，而是用 6 个代码工具 + bash 实现无限可能。**
-
-- 要截图？LLM 会 `bash: python -c "from mss import mss; mss().shot()"`
-- 要控制鼠标？LLM 会 `bash: python -c "import pyautogui; pyautogui.click(100,200)"`
-- 要爬网页？LLM 会 `bash: curl ... | python -c "..."`
-
-这就是极简的力量：让 LLM 做它最擅长的事 — **思考和组合**。
-
-## 快速开始
-
-```bash
-git clone https://github.com/ZhuLinsen/MiniAgent.git && cd MiniAgent
-uv sync
-cp .env.example .env  # 填入你的 API Key
-uv run miniagent       # 启动！
-```
-
-<details>
-<summary>📋 详细安装说明</summary>
-
-### 安装
-
-推荐使用 uv：
+## 三步开始
 
 ```bash
 git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
-uv sync
+python -m pip install .
 ```
 
-也可以继续使用 pip：
+在项目内创建 `.env`，填入自己的 Provider 密钥和模型 ID。下面的 `<model-id>` 必须替换；Qwen 使用 `dashscope:<model-id>` 和 `DASHSCOPE_API_KEY`，Claude 使用 `anthropic:<model-id>` 和 `ANTHROPIC_API_KEY`。
+
+必须显式选择模型；只设置密钥或 API 地址时，CLI 会在创建客户端前提示缺少模型。`--model` 优先于 JSON 中的 `llm.model`，再优先于 `LLM_MODEL`。
+
+```dotenv
+DEEPSEEK_API_KEY=your-provider-key
+LLM_MODEL=deepseek:<model-id>
+```
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-pip install -e .
+miniagent --policy readonly --prompt "检查当前项目结构，说明主要入口"
+miniagent
 ```
 
-### 配置
+默认需要确认文件修改、Shell 和 MCP 调用；非交互模式拒绝确认。`--policy trusted` 适用于你明确信任的自动化任务。托管文件工具默认隐藏 `.env*`（`.env.example` 除外）、`.git` 和私钥文件，只有显式使用 `--allow-sensitive-files` 才开放。Shell、Python 插件和 MCP 服务属于可信代码，不受文件工具边界隔离。
 
-创建 `.env` 文件（参考 `.env.example`）：
+## 核心能力
 
-```bash
-LLM_API_KEY=your_api_key_here
-LLM_MODEL=deepseek-chat
-LLM_API_BASE=https://api.deepseek.com/v1
-```
+- 原生工具调用和流式文本；统一异步模型边界及 Provider 密钥隔离。
+- 实例独立的工具注册表；插件依赖排序、失败回滚和逆序资源清理。
+- `read / write / edit / grep / glob / bash` 编程工具，支持工作区约束和授权。
+- JSONL 会话、完整工具组的上下文压缩，以及异常副作用的人工核查恢复。
+- 可切换的 Skill 执行白名单；官方 MCP SDK stdio 接入（可选安装）。
 
-Gemini 可使用 Google 的 OpenAI 兼容接口：
+CLI 可用 `/help`、`/model`、`/plugins`、`/skills`、`/session`、`/stream`；`/plugins` 当前仅列出已加载插件。`--session <path>` 恢复已有会话，`/session new` 新建会话。模型切换会新建会话。
 
-```bash
-GEMINI_API_KEY=your_gemini_api_key
-LLM_MODEL=gemini-2.5-flash
-LLM_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai/
-```
-
-### 运行
-
-```bash
-uv run miniagent          # 或 uv run python -m miniagent
-```
-
-如果使用 pip 安装：
-
-```bash
-miniagent          # 或 python -m miniagent
-```
-
-安装可选的 Word 文档依赖：
-
-```bash
-uv sync --extra docx
-# 或 pip install python-docx
-```
-
-</details>
-
-## 使用示例
-
-```
-you: 帮我创建一个 hello.py 文件
-  ● write hello.py (1 lines)
-    → ok
-🤖 已创建 hello.py 文件！
-
-you: 运行一下
-  ● bash python hello.py
-    → Hello World!
-🤖 运行成功！
-```
-
-## ⚡ 演示
-
-### 1. 操控浏览器搜索
-> Prompt: "Open the browser, then search for 'zhulinsen/miniagent' on Google."
-
-<img src="resource/miniagent_chrome.gif" alt="Browser Automation Demo" width="100%"/>
-
-### 2. 自动化办公 (Word)
-> Prompt: "Write a 500-word overview of AI agents in Word and format"
-
-<img src="resource/miniagent_word.gif" alt="Word Creation Demo" width="100%"/>
-
-### 3. 代码生成 (Coding)
-> Prompt: "Create a ppo.py implementation and perform testing"
-
-<img src="resource/miniagent_coding.png" alt="Coding Demo" width="100%"/>
-
-## 内置工具
-
-| 类别 | 工具 | 描述 |
-|---|---|---|
-| **Coding** | `read` | 读取文件内容 |
-| | `write` | 创建/覆盖文件 |
-| | `edit` | 编辑文件指定行 |
-| | `grep` | 搜索文件内容 |
-| | `glob` | 列出匹配的文件 |
-| | `bash` | 执行 Shell 命令（支持超时控制） |
-| **OS** | `open_browser` | 打开网页或搜索 |
-| | `open_app` | 启动本地应用 (calc, notepad...) |
-| | `create_docx` | 创建 Word 文档 |
-| | `clipboard_copy`| 复制到剪贴板 |
-| | `clipboard_read`| 读取剪贴板内容 |
-| **System** | `system_info` | 系统信息 |
-| | `system_load` | CPU/内存/磁盘负载 |
-| | `process_list` | 进程列表 |
-| | `disk_usage` | 磁盘使用情况 |
-| | `env_get` | 读取环境变量 |
-| | `env_set` | 设置环境变量 |
-| **Misc** | `calculator` | 数学计算（AST 安全求值） |
-| | `get_current_time` | 当前时间 |
-| | `web_search` | 网页搜索 |
-| | `http_request` | HTTP 请求 |
-| | `file_stats` | 文件/目录统计 |
-
-## 项目结构
-
-```
-miniagent/
-├── agent.py        # 🧠 核心 Agent 引擎（从这里开始读！）
-│                   #    LLM 循环 + 工具调用 + 上下文管理
-├── cli.py          # 💬 交互式命令行界面（Rich + 流式输出）
-├── tools/          # 🔧 工具集
-│   ├── code_tools.py   # 代码工具 (read/write/edit/grep/glob/bash)
-│   └── basic_tools.py  # 基础工具 (calculator/browser/clipboard/docx...)
-├── extensions/     # 🔌 可选扩展
-│   ├── mcp_client.py   # MCP 协议客户端
-│   └── orchestrator.py # 多 Agent 编排器
-├── skills.py       # 🎯 Skill 系统（可复用的 Agent 角色配置）
-├── config.py       # ⚙️ 配置管理（.env + JSON + 环境变量）
-├── memory.py       # 💾 轻量会话记忆
-└── utils/          # 工具函数
-    ├── json_utils.py   # 健壮 JSON 解析
-    ├── text_utils.py   # 文本处理
-    └── reflector.py    # 反思机制（可选）
-```
-
-## 双模式工具调用
-
-MiniAgent 支持两种工具调用模式，便于学习和对比：
-
-### 文本模式（默认）
-LLM 在响应中输出结构化文本，Agent 解析执行 — **完全透明，最佳教学模式**：
-```python
-agent.run("计算 2+2")  # 默认文本模式
-```
-
-### 原生 Function Calling 模式
-使用 OpenAI 兼容的 tools 参数 — **更可靠，支持并行工具调用**：
-```python
-agent.run("计算 2+2", mode="native")  # 原生 FC 模式
-```
-
-## MCP 协议支持
-
-连接任意 MCP 工具服务器，一行代码接入社区生态：
+## Python API
 
 ```python
-from miniagent import MiniAgent, load_mcp_tools
+from miniagent import Harness
+from miniagent.plugins import coding_tools
+from miniagent.policy import Policy
+from miniagent.session import Session
 
-agent = MiniAgent(model="deepseek-chat", api_key="...")
-
-# 加载 MCP 文件系统工具
-for tool in load_mcp_tools("npx @anthropic/mcp-server-filesystem /tmp"):
-    agent.add_tool(tool)
+app = Harness(model="deepseek:<model-id>", policy=Policy(mode="readonly"),
+              session=Session("task.jsonl"))
+app.use(coding_tools())
+print(app.run("检查项目结构"))
 ```
 
-## Agent 编排
+已有事件循环中使用 `await app.arun(...)`，并通过 `async with app` 管理资源。一个 Harness 同时只运行一个任务；插件和 Skill 仅在空闲时修改。
 
-内置编排器，自动分解复杂任务并分配给专业 Worker（基于 Skill 系统）：
+## 一个自定义插件
 
 ```python
-from miniagent import Orchestrator
+from miniagent import Harness, Plugin
+from miniagent.policy import Policy
+from miniagent.tools.registry import Tool
 
-orch = Orchestrator(model="deepseek-chat", api_key="...", base_url="...")
-result = orch.run("研究 Python 异步模式，写一个 demo 并测试")
-# 自动规划: researcher → coder → tester
+def calculator(ctx):
+    ctx.tool(Tool("add_one", "Add one", {"type": "object",
+                  "properties": {"n": {"type": "integer"}}, "required": ["n"]},
+                  lambda n: n + 1))
+
+app = Harness(model="deepseek:<model-id>", policy=Policy(mode="trusted"))
+app.use(Plugin("calculator", calculator))
+print(app.run("调用 add_one 给 2 加 1"))
 ```
 
-## Skill 系统
+这是显式信任自定义工具的示例。更多模型配置、MCP 安装与插件示例、Skill 切换、恢复步骤和兼容边界见 [运行指南](docs/lean-harness.md)。
 
-Skill 是可复用的 Agent 配置：prompt + 工具白名单 + 参数。内置 4 个 Skill，也可自定义：
+## 验证与版本边界
 
-```python
-from miniagent import MiniAgent, Skill, register_skill
+CI 覆盖 Windows/Linux、Python 3.11/3.12、离线回归、原生运行时静态检查、依赖审计、构建，以及不安装 MCP/Legacy 扩展的 wheel 验证。OpenAI、DeepSeek、DashScope/Qwen、Anthropic 的 SDK 多轮工具协议使用本地 HTTP 测试；它们不代表真实 API 验收。
 
-# 使用内置 Skill
-agent = MiniAgent(model="deepseek-chat", api_key="...", base_url="...")
-agent.load_all_tools()
-agent.load_skill("coder")  # 自动设置代码专家 prompt + 只保留代码工具
+`python scripts/source_stats.py` 分别报告四文件内核、含 Policy/工具插件/Session 的运行机制、以及**全部官方 Python 源码**。旧教学与扩展兼容代码仍保留，总体 2000～2800 行目标尚未达到。未提供真实模型任务截图或性能对比，不以模拟输出替代真实演示。
 
-# 自定义 Skill
-register_skill(Skill(
-    name="devops",
-    prompt="You are a DevOps engineer. Focus on CI/CD, Docker, and infrastructure.",
-    tools=["bash", "read", "write"],
-    temperature=0.3,
-))
-```
+旧教学 CLI 使用 `miniagent --legacy`；基础/系统工具需安装 `miniagent[legacy]`。旧隐式 MCP API 已移除，按指南迁移到 `mcp_plugin`。动态依赖恢复、长期 Memory 和 Streamable HTTP 不属于本次 alpha 交付。
 
-## 自定义工具
+## 致谢与许可证
 
-```python
-from miniagent import MiniAgent
-from miniagent.tools import register_tool
-
-@register_tool
-def my_tool(arg: str) -> str:
-    """我的自定义工具"""
-    return f"处理: {arg}"
-
-agent = MiniAgent(...)
-agent.load_builtin_tool("my_tool")
-```
-
-## 与同类项目对比
-
-| 特点 | MiniAgent | smolagents | pydantic-ai | LangChain |
-|------|-----------|-----------|------------|-----------|
-| 核心代码 | 单文件可读 | ~1,000行 | 182MB | 10万+行 |
-| 工具调用 | 文本解析 + 原生FC 双模式 | Code Agent | 原生FC | 多层抽象 |
-| 可读性 | ⭐⭐⭐⭐⭐ 初学者友好 | ⭐⭐⭐⭐ 紧凑 | ⭐⭐⭐ 企业级 | ⭐⭐ 复杂 |
-| OS 控制 | bash 万能 + 专用工具 | 需扩展 | 需扩展 | 需插件 |
-| 教学价值 | 最好的 Agent 教科书 | HuggingFace 生态强 | 类型安全最佳 | 过于复杂 |
-| 模型支持 | 全模型兼容 | 全模型 | 全模型 | 全模型 |
-| Skill 系统 | ✅ 内置 | ❌ | ❌ | ❌ |
-| MCP 支持 | ✅ | ❌ | ✅ | 需插件 |
-
-## 致谢
-
-MiniAgent 的 Code Tools 设计参考了 [nanocode](https://github.com/1rgs/nanocode) 项目，感谢其优雅的极简实现思路！
-
-## 许可证
-
-[Apache License 2.0](LICENSE)
-
----
-
-⭐ 如果这个项目对你有帮助，请给个 Star！
+编程工具设计参考 [nanocode](https://github.com/1rgs/nanocode)。本项目使用 [Apache License 2.0](LICENSE)。

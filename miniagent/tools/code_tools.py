@@ -19,6 +19,7 @@ from ..utils.text_utils import smart_truncate
 
 logger = get_logger(__name__)
 _workspace = ContextVar("miniagent_workspace", default=None)
+_path_allowed = ContextVar("miniagent_path_allowed", default=lambda path: True)
 
 
 def _resolve_path(path: str) -> Path:
@@ -45,11 +46,12 @@ def _write_text_file(path: Path, content: str) -> None:
 
 def _iter_files(root: Path) -> List[Path]:
     if root.is_file():
-        return [root]
+        return [root] if _path_allowed.get()(root) else []
     if not root.exists():
         return []
     workspace = _workspace.get()
     return [p for p in root.rglob("*") if p.is_file()
+            and _path_allowed.get()(p.resolve())
             and (workspace is None or p.resolve().is_relative_to(workspace))]
 
 
@@ -156,7 +158,8 @@ def glob(pattern: str, path: str = ".") -> List[str]:  # noqa: A002
         matches = root.glob(pattern)
         workspace = _workspace.get()
         return [str(p.resolve()) for p in matches
-                if workspace is None or p.resolve().is_relative_to(workspace)]
+                if (workspace is None or p.resolve().is_relative_to(workspace))
+                and _path_allowed.get()(p.resolve())]
     except Exception as e:
         logger.exception("glob failed")
         return [f"error: glob failed: {e}"]

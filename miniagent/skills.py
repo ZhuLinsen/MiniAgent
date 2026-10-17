@@ -94,8 +94,14 @@ def read_skill(path):
         tools = json.loads(tools) if tools.startswith("[") else shlex.split(tools)
         if not isinstance(tools, list) or not all(isinstance(t, str) for t in tools):
             raise ValueError("Skill tools must be a list of names")
+    limit = meta.get("max-iterations", meta.get("max_iterations"))
+    limit = int(limit) if limit is not None else None
+    if limit is not None and limit < 1:
+        raise ValueError("Skill max_iterations must be positive")
+    temperature = float(meta["temperature"]) if "temperature" in meta else None
     return Skill(name=meta.get("name", file.parent.name), prompt=prompt.strip(),
-                 tools=tools, description=meta.get("description", ""))
+                 tools=tools, description=meta.get("description", ""),
+                 max_iterations=limit, temperature=temperature)
 
 
 # ---------------------------------------------------------------------------

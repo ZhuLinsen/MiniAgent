@@ -150,3 +150,11 @@ def test_shell_timeout_and_cancel(tmp_path):
         with pytest.raises(asyncio.CancelledError):
             await task
     run(scenario())
+
+
+def test_shell_output_is_bounded_while_draining(tmp_path, monkeypatch):
+    monkeypatch.setenv("BASH_MAX_OUTPUT", "1000")
+    command = f'"{sys.executable}" -c "print(\'x\' * 1000000); print(\'END\')"'
+    result = run(shell(command, cwd=str(tmp_path)))
+    assert result["exit_code"] == 0
+    assert len(result["stdout"]) <= 1000 and "END" in result["stdout"]

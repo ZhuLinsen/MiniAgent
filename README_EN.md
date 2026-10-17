@@ -1,303 +1,88 @@
 # MiniAgent
 
-🚀 **Build an AI Coding Assistant + CLI-based Manus in 5 Minutes!** | [中文版本](README.md)
+**Tiny Core. Real Agent Capabilities.** A plugin-first Python Agent Harness that combines models, tools, Skills, MCP and resumable sessions.
 
-<div align="center">
-  <img src="resource/miniagent.png" alt="MiniAgent" width="400"/>
+[中文](README.md) · [Runtime and migration guide](docs/lean-harness.md) · [Changelog](docs/CHANGELOG.md) · [CI](https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml)
 
-  [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-  [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://python.org)
-  [![GitHub stars](https://img.shields.io/github/stars/ZhuLinsen/MiniAgent?style=social)](https://github.com/ZhuLinsen/MiniAgent)
-</div>
+Requires **Python 3.11+**. Version **0.2.0a1** is for evaluating the architecture and developing plugins. Two models passed live Anspire gateway acceptance; native multi-provider acceptance and the total-source reduction target remain incomplete. See the [acceptance evidence](docs/acceptance-2026-10-11.md).
 
-## 💡 Core Features
-
-**A single `agent.py` core file to replicate Claude Code's coding capabilities + Manus's OS control!**
-
-MiniAgent is a **minimalist, transparent, and powerful CLI Agent framework** — no bloated dependencies or complex architectures:
-
-- 🧠 **Code Agent**: Write code, fix bugs, and run tests like Claude Code
-- 🦾 **OS Agent**: Control browsers, edit documents, and manage apps like Manus
-- ⚡ **Minimalist**: Core engine `agent.py` is fully transparent and hackable
-- 🤖 **Model Agnostic**: DeepSeek, OpenAI, Gemini, Claude, and any OpenAI-compatible models
-- 🔌 **Extensible**: Simple decorator pattern — add custom tools in 3 lines of code
-- 🔄 **Dual Tool Calling**: Text parsing mode (transparent, educational) + Native Function Calling (reliable)
-- 🎯 **Skill System**: Reusable Agent configs with built-in coder/researcher/reviewer/tester roles
-- 🛡️ **Safety Guards**: Auto-detect and confirm dangerous commands before execution
-- 💬 **Streaming**: Real-time token-by-token output with auto context compression
-- 🔗 **MCP Protocol**: Connect to MCP tool servers to access the community ecosystem
-- 🤝 **Agent Orchestration**: Built-in orchestrator with task decomposition and role-based collaboration
-
-## 🤔 Why MiniAgent?
-
-| | MiniAgent | smolagents | pydantic-ai | LangChain |
-|---|---|---|---|---|
-| **Focus** | CLI Agent textbook | HuggingFace ecosystem | Enterprise type-safety | Universal framework |
-| **Core code** | Single readable file | ~1,000 lines | 182MB | 100K+ lines |
-| **Tool calling** | Text parse + native FC | Code Agent | Native FC | Multi-layer abstraction |
-| **Learning curve** | ⭐ 30 min | ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| **Dependencies** | 7 | ~20 | ~15 | 50+ |
-| **OS control** | Universal bash | Needs extensions | Needs extensions | Needs plugins |
-
-> **MiniAgent's unique value: the best AI Agent textbook.** No magic, no abstractions — beginners can fully understand how an Agent works.
-
-## Design Philosophy
-
-> **MiniAgent doesn't ship 100 built-in tools. Instead, it uses 6 code tools + bash to achieve unlimited capabilities.**
-
-- Need a screenshot? The LLM will `bash: python -c "from mss import mss; mss().shot()"`
-- Need mouse control? The LLM will `bash: python -c "import pyautogui; pyautogui.click(100,200)"`
-- Need web scraping? The LLM will `bash: curl ... | python -c "..."`
-
-That's the power of minimalism: let the LLM do what it does best — **think and compose**.
-
-## Quick Start
-
-```bash
-git clone https://github.com/ZhuLinsen/MiniAgent.git && cd MiniAgent
-uv sync
-cp .env.example .env  # Fill in your API Key
-uv run miniagent       # Launch!
-```
-
-<details>
-<summary>📋 Detailed Installation</summary>
-
-### Installation
-
-Recommended with uv:
+## Get started
 
 ```bash
 git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
-uv sync
+python -m pip install .
 ```
 
-You can also continue using pip:
+Create `.env` in the project and fill in your provider key and model ID. Replace `<model-id>` below. For Qwen use `dashscope:<model-id>` and `DASHSCOPE_API_KEY`; for Claude use `anthropic:<model-id>` and `ANTHROPIC_API_KEY`.
+
+Select a model explicitly. A key or API URL alone causes the CLI to report a missing model before creating a client. `--model` takes precedence over JSON `llm.model`, then `LLM_MODEL`.
+
+```dotenv
+DEEPSEEK_API_KEY=your-provider-key
+LLM_MODEL=deepseek:<model-id>
+```
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-pip install -e .
+miniagent --policy readonly --prompt "Inspect the project structure and explain its entry points"
+miniagent
 ```
 
-### Configuration
+Writes, Shell and MCP calls require confirmation by default. Noninteractive confirmation denies execution. Use `--policy trusted` for automation you explicitly trust. Managed file tools hide `.env*` (except `.env.example`), `.git` and private-key files unless `--allow-sensitive-files` is explicitly supplied. Shell, Python plugins and MCP servers are trusted code outside the managed file boundary.
 
-Create a `.env` file (see `.env.example` for all options):
+## Capabilities
 
-```bash
-LLM_API_KEY=your_api_key_here
-LLM_MODEL=deepseek-chat
-LLM_API_BASE=https://api.deepseek.com/v1
-```
+- Native tool calls and streamed text; one async model boundary with provider credential isolation.
+- Instance-owned tool registry; plugin dependency ordering, activation rollback and reverse cleanup.
+- `read / write / edit / grep / glob / bash` with workspace checks and authorization.
+- JSONL sessions, context compaction that preserves whole tool groups, and inspection before resuming uncertain effects.
+- Reversible Skill execution whitelists and optional official MCP SDK stdio integration.
 
-Gemini works through Google's OpenAI-compatible endpoint:
+CLI commands: `/help`, `/model`, `/plugins`, `/skills`, `/session`, `/stream`. `/plugins` currently lists loaded plugins. `--session <path>` resumes a session; `/session new` creates one. Switching models creates a fresh session.
 
-```bash
-GEMINI_API_KEY=your_gemini_api_key
-LLM_MODEL=gemini-2.5-flash
-LLM_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai/
-```
-
-### Run
-
-```bash
-uv run miniagent          # or uv run python -m miniagent
-```
-
-If installed with pip:
-
-```bash
-miniagent          # or python -m miniagent
-```
-
-Install the optional Word document dependency:
-
-```bash
-uv sync --extra docx
-# or pip install python-docx
-```
-
-</details>
-
-```
-you: Create a hello.py file
-  ● write hello.py (1 lines)
-    → ok
-🤖 Created hello.py!
-
-you: Run it
-  ● bash python hello.py
-    → Hello World!
-🤖 Runs successfully!
-```
-
-## ⚡ Demos
-
-### 1. Browser Automation
-> Prompt: "Open the browser, then search for 'zhulinsen/miniagent' on Google."
-
-<img src="resource/miniagent_chrome.gif" alt="Browser Automation Demo" width="100%"/>
-
-### 2. Office Automation (Word)
-> Prompt: "Write a 500-word overview of AI agents in Word and format"
-
-<img src="resource/miniagent_word.gif" alt="Word Creation Demo" width="100%"/>
-
-### 3. Code Generation
-> Prompt: "Create a ppo.py implementation and perform testing"
-
-<img src="resource/miniagent_coding.png" alt="Coding Demo" width="100%"/>
-
-## Built-in Tools
-
-| Category | Tool | Description |
-|---|---|---|
-| **Coding** | `read` | Read file content |
-| | `write` | Create/Overwrite file |
-| | `edit` | Edit specific lines in file |
-| | `grep` | Search file content |
-| | `glob` | List matching files |
-| | `bash` | Execute Shell commands (with timeout) |
-| **OS** | `open_browser` | Open web page or search |
-| | `open_app` | Launch local apps (calc, notepad...) |
-| | `create_docx` | Create Word documents |
-| | `clipboard_copy`| Copy to clipboard |
-| | `clipboard_read`| Read clipboard content |
-| **System** | `system_info` | System information |
-| | `system_load` | CPU/memory/disk load |
-| | `process_list` | Process listing |
-| | `disk_usage` | Disk usage stats |
-| | `env_get` | Read environment variable |
-| | `env_set` | Set environment variable |
-| **Misc** | `calculator` | Math (AST-safe evaluation) |
-| | `get_current_time` | Current time |
-| | `web_search` | Web search |
-| | `http_request` | HTTP requests |
-| | `file_stats` | File/directory statistics |
-
-## Project Structure
-
-```
-miniagent/
-├── agent.py        # 🧠 Core Agent engine (start reading here!)
-│                   #    LLM loop + tool calling + context management
-├── cli.py          # 💬 Interactive CLI (Rich + streaming output)
-├── tools/          # 🔧 Tool sets
-│   ├── code_tools.py   # Code tools (read/write/edit/grep/glob/bash)
-│   └── basic_tools.py  # Basic tools (calculator/browser/clipboard/docx...)
-├── extensions/     # 🔌 Optional extensions
-│   ├── mcp_client.py   # MCP protocol client
-│   └── orchestrator.py # Multi-agent orchestrator
-├── skills.py       # 🎯 Skill system (reusable Agent role configs)
-├── config.py       # ⚙️ Configuration (.env + JSON + environment variables)
-├── memory.py       # 💾 Lightweight session memory
-└── utils/          # Utility functions
-    ├── json_utils.py   # Robust JSON parsing
-    ├── text_utils.py   # Text processing
-    └── reflector.py    # Reflection mechanism (optional)
-```
-
-## Dual Tool Calling Modes
-
-MiniAgent supports two tool calling modes for learning and comparison:
-
-### Text Mode (Default)
-The LLM outputs structured text in its response, and the Agent parses it — **fully transparent, best for learning**:
-```python
-agent.run("Calculate 2+2")  # default text mode
-```
-
-### Native Function Calling Mode
-Uses OpenAI-compatible `tools` parameter — **more reliable, supports parallel tool calls**:
-```python
-agent.run("Calculate 2+2", mode="native")  # native FC mode
-```
-
-## MCP Protocol Support
-
-Connect any MCP tool server with one line of code:
+## Python API
 
 ```python
-from miniagent import MiniAgent, load_mcp_tools
+from miniagent import Harness
+from miniagent.plugins import coding_tools
+from miniagent.policy import Policy
+from miniagent.session import Session
 
-agent = MiniAgent(model="deepseek-chat", api_key="...")
-
-# Load MCP filesystem tools
-for tool in load_mcp_tools("npx @anthropic/mcp-server-filesystem /tmp"):
-    agent.add_tool(tool)
+app = Harness(model="deepseek:<model-id>", policy=Policy(mode="readonly"),
+              session=Session("task.jsonl"))
+app.use(coding_tools())
+print(app.run("Inspect the project structure"))
 ```
 
-## Agent Orchestration
+In an existing event loop use `await app.arun(...)` and `async with app` for resource ownership. One task per Harness; plugins and Skills change only while idle.
 
-Built-in orchestrator automatically decomposes complex tasks and assigns them to specialized Workers (Skill-driven):
+## A custom plugin
 
 ```python
-from miniagent import Orchestrator
+from miniagent import Harness, Plugin
+from miniagent.policy import Policy
+from miniagent.tools.registry import Tool
 
-orch = Orchestrator(model="deepseek-chat", api_key="...", base_url="...")
-result = orch.run("Research Python async patterns, write a demo and test it")
-# Auto-plans: researcher → coder → tester
+def calculator(ctx):
+    ctx.tool(Tool("add_one", "Add one", {"type": "object",
+                  "properties": {"n": {"type": "integer"}}, "required": ["n"]},
+                  lambda n: n + 1))
+
+app = Harness(model="deepseek:<model-id>", policy=Policy(mode="trusted"))
+app.use(Plugin("calculator", calculator))
+print(app.run("Use add_one to add 1 to 2"))
 ```
 
-## Skill System
+This example explicitly trusts the custom tool. The [runtime guide](docs/lean-harness.md) covers model configuration, MCP installation and plugins, Skill switching, recovery and compatibility.
 
-Skills are reusable Agent configs: prompt + tool whitelist + parameters. 4 built-in Skills, plus custom:
+## Validation and version boundaries
 
-```python
-from miniagent import MiniAgent, Skill, register_skill
+CI covers Windows/Linux, Python 3.11/3.12, offline regression, native-runtime static checks, dependency audit, builds and installed-wheel verification without MCP/Legacy extras. Local HTTP fixtures exercise OpenAI, DeepSeek, DashScope/Qwen and Anthropic SDK multi-turn tool protocols. They do not establish live API compatibility.
 
-# Use a built-in Skill
-agent = MiniAgent(model="deepseek-chat", api_key="...", base_url="...")
-agent.load_all_tools()
-agent.load_skill("coder")  # Auto-sets coding expert prompt + code tools only
+`python scripts/source_stats.py` reports the four-file core, runtime mechanisms including Policy/tool plugin/Session, and **all official Python source** separately. Teaching and extension compatibility code remains; the 2000–2800 total-line target is not achieved. No live model task screenshot or performance comparison is claimed; simulated output is not presented as a real demo.
 
-# Register a custom Skill
-register_skill(Skill(
-    name="devops",
-    prompt="You are a DevOps engineer. Focus on CI/CD, Docker, and infrastructure.",
-    tools=["bash", "read", "write"],
-    temperature=0.3,
-))
-```
+Use `miniagent --legacy` for the teaching CLI and install `miniagent[legacy]` for basic/system tools. The old implicit MCP API was removed; migrate to `mcp_plugin` as documented. Automatic dependency recovery, long-term Memory and Streamable HTTP are outside this alpha delivery.
 
-## Custom Tools
+## Acknowledgments and license
 
-```python
-from miniagent import MiniAgent
-from miniagent.tools import register_tool
-
-@register_tool
-def my_tool(arg: str) -> str:
-    """My custom tool"""
-    return f"Processed: {arg}"
-
-agent = MiniAgent(...)
-agent.load_builtin_tool("my_tool")
-```
-
-## Comparison with Similar Projects
-
-| Feature | MiniAgent | smolagents | pydantic-ai | LangChain |
-|---------|-----------|-----------|------------|-----------|
-| Core code | Single readable file | ~1,000 lines | 182MB | 100K+ lines |
-| Tool calling | Text + Native FC dual mode | Code Agent | Native FC | Multi-layer abstraction |
-| Readability | ⭐⭐⭐⭐⭐ Beginner-friendly | ⭐⭐⭐⭐ Compact | ⭐⭐⭐ Enterprise | ⭐⭐ Complex |
-| OS control | Universal bash + dedicated tools | Needs extensions | Needs extensions | Needs plugins |
-| Learning value | Best Agent textbook | HuggingFace ecosystem | Type-safety best | Too complex |
-| Model support | Universal | Universal | Universal | Universal |
-| Skill system | ✅ Built-in | ❌ | ❌ | ❌ |
-| MCP support | ✅ | ❌ | ✅ | Needs plugins |
-
-## Acknowledgments
-
-MiniAgent's Code Tools design is inspired by the [nanocode](https://github.com/1rgs/nanocode) project. Thanks for the elegant minimalist approach!
-
-## License
-
-[Apache License 2.0](LICENSE)
-
----
-
-⭐ If this project helps you, please give it a Star!
+Coding tools are inspired by [nanocode](https://github.com/1rgs/nanocode). Licensed under [Apache License 2.0](LICENSE).

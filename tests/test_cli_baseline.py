@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from miniagent import cli
+from miniagent import legacy_cli as cli
 
 
 def test_current_user_is_not_duplicated(monkeypatch):

@@ -63,6 +63,11 @@ def get_tool(name: str) -> Optional[ToolFunction]:
     Returns:
         Tool function or None if not found
     """
+    if name not in _TOOLS and name in _BASIC_NAMES:
+        try:
+            importlib.import_module("miniagent.tools.basic_tools")
+        except ImportError as error:
+            raise ImportError("Install miniagent[legacy] for optional basic tools") from error
     return _TOOLS.get(name)
 
 def clear_tools() -> None:
@@ -233,17 +238,18 @@ def get_tools_description(tools: Optional[List[str]] = None) -> List[Dict[str, A
     
     return [get_tool_description(func) for func in tool_funcs.values()]
 
-# Try to import built-in tools, handle import errors gracefully
-try:
-    from .basic_tools import (
-        calculator, get_current_time, system_info, file_stats,
-        disk_usage, process_list, system_load, web_search, http_request,
-        open_browser, open_app, clipboard_copy, clipboard_read,
-        create_docx, env_get, env_set
-    )
-    logger.debug("Imported all tools from basic_tools")
-except ImportError as e:
-    logger.warning(f"Failed to import some tools: {e}")
+_BASIC_NAMES = {
+    "calculator", "get_current_time", "system_info", "file_stats",
+    "disk_usage", "process_list", "system_load", "web_search", "http_request",
+    "open_browser", "open_app", "clipboard_copy", "clipboard_read",
+    "create_docx", "env_get", "env_set",
+}
+
+
+def __getattr__(name):
+    if name in _BASIC_NAMES:
+        return get_tool(name)
+    raise AttributeError(name)
 
 # Code tools (optional import so the package remains robust)
 try:
@@ -282,4 +288,4 @@ def load_tools(tools: Union[List[str], str, None] = None) -> List[str]:
         else:
             logger.warning(f"Tool '{tool_name}' not found")
     
-    return loaded_tools 
+    return loaded_tools

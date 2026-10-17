@@ -1,7 +1,7 @@
 import asyncio
 import json
 from types import SimpleNamespace as NS
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -72,6 +72,23 @@ def test_custom_provider_does_not_use_openai_key(monkeypatch):
             "type": "openai-compatible", "base_url": "https://test.invalid/v1", "api_key_env": "CUSTOM_KEY"}})
 
 
+def test_stream_preserves_signed_provider_metadata():
+    async def chunks():
+        yield NS(usage=None, choices=[NS(finish_reason=None, delta=NS(content=None,
+            reasoning=NS(content="reason"), extra_content={"anthropic": {"signature": "sig"}},
+            tool_calls=[NS(index=0, id="one", function=NS(name="add", arguments="{}"),
+                           extra_content={"google": {"thought_signature": "opaque"}})]))])
+        yield NS(usage=None, choices=[NS(finish_reason="tool_calls", delta=NS(content=None,
+            extra_content={"anthropic": {"signature": "nature"}}, tool_calls=[]))])
+    async def scenario():
+        backend = LLMBackend("mock:test", client=NS(acompletion=AsyncMock(return_value=chunks())))
+        result = await backend.complete([], [], lambda text: None)
+        assert result["reasoning_content"] == "reason"
+        assert result["extra_content"]["anthropic"]["signature"] == "signature"
+        assert result["tool_calls"][0]["extra_content"]["google"]["thought_signature"] == "opaque"
+    asyncio.run(scenario())
+
+
 def test_provider_resolution_isolated(monkeypatch):
     from miniagent.config import load_config
     monkeypatch.setenv("LLM_MODEL", "anthropic:test")
@@ -88,10 +105,50 @@ def test_live_provider():
     if not model:
         pytest.skip("Set MINIAGENT_TEST_MODEL and provider credentials for a live smoke test")
     async def scenario():
-        backend = LLMBackend(model)
+        backend = _live_backend(model)
         try:
-            result = await backend.complete([{"role": "user", "content": "Say hello."}], [])
+            result = await backend.complete([{"role": "user", "content": "Reply only OK."}], [])
             assert result.get("content")
         finally:
             await backend.aclose()
     asyncio.run(scenario())
+
+
+@pytest.mark.live
+@pytest.mark.parametrize("streaming", [False, True])
+def test_live_multi_turn_tool_call(streaming):
+    import os
+    from miniagent import Harness, Plugin
+    from miniagent.policy import Policy
+    from miniagent.tools.registry import Tool
+    model = os.environ.get("MINIAGENT_TEST_MODEL")
+    if not model:
+        pytest.skip("Set MINIAGENT_TEST_MODEL and provider credentials for live tool acceptance")
+    async def scenario():
+        backend = _live_backend(model)
+        app = Harness(backend, policy=Policy(mode="trusted"), system_prompt=
+                      "Use the add_one tool with n=2 before answering. Report the tool result.")
+        app.use(Plugin("tools", lambda ctx: ctx.tool(Tool("add_one", "Add one to an integer",
+            {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}, lambda n: n + 1))))
+        chunks = []
+        try:
+            result = await app.arun("Calculate 2 plus 1 using add_one.", stream=chunks.append if streaming else None, max_steps=3)
+            assert result and any(m["role"] == "tool" and m["content"] == "3" for m in app.messages)
+            if streaming:
+                assert chunks
+        finally:
+            await app.aclose()
+            await backend.aclose()
+    asyncio.run(scenario())
+
+
+def _live_backend(model):
+    """Respect explicit gateway configuration and bound acceptance-test spend."""
+    from functools import partial
+    from miniagent.config import load_config
+    cfg = load_config(model_override=model)
+    backend = LLMBackend(model, providers=cfg.providers, api_key=cfg.llm.api_key,
+                         base_url=cfg.llm.api_base, temperature=0, timeout=30)
+    limits = {"max_completion_tokens": 512} if backend.provider == "openai" else {"max_tokens": 256}
+    backend.client.acompletion = partial(backend.client.acompletion, **limits)
+    return backend
