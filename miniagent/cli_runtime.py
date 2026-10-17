@@ -3,7 +3,6 @@ import os
 import json
 import sys
 import time
-from pathlib import Path
 from uuid import uuid4
 
 from rich.console import Console
@@ -12,6 +11,7 @@ from rich.prompt import Prompt
 from rich.text import Text
 
 from .config import load_config
+from .connections import PROVIDERS, connect, error_text, home, select_model
 from .harness import Harness
 from .llm import LLMBackend
 from .plugins import coding_tools
@@ -21,8 +21,7 @@ from .skills import get_skill, list_skills, read_skill
 
 
 def new_session():
-    home = Path(os.environ.get("MINIAGENT_HOME", str(Path.home() / ".miniagent")))
-    return Session(home / "sessions" / f"{uuid4().hex}.jsonl")
+    return Session(home() / "sessions" / f"{uuid4().hex}.jsonl")
 
 
 async def cli_run(args, *, console=None, backend=None):
@@ -33,8 +32,28 @@ async def cli_run(args, *, console=None, backend=None):
         console.print(Text(f"Configuration error: {error}", style="red"))
         return 2
     model = cfg.llm.model
-    if backend is None and not model:
-        console.print(Text("Model is required. Set LLM_MODEL=provider:model-id, llm.model in JSON, or --model provider:model-id. A provider key alone does not select a model.", style="red"))
+    provider = model.partition(":")[0] if ":" in model else "openai"
+    custom = cfg.providers.get(provider, {})
+    needs_key = bool(custom.get("api_key_env")) if custom else provider in PROVIDERS
+    needs_config = not model or (needs_key and not (args.api_key or cfg.llm.api_key))
+    explicit_connect = getattr(args, "connect", False)
+    if explicit_connect or (backend is None and needs_config and args.prompt is None and sys.stdin.isatty()):
+        if not sys.stdin.isatty():
+            console.print(Text("Interactive model configuration requires a TTY.", style="red"))
+            return 2
+        try:
+            model = await connect(console, cfg)
+            if explicit_connect:
+                return 0
+            cfg = load_config(args.config, model_override=model, base_override=args.base_url)
+        except (EOFError, KeyboardInterrupt):
+            return 130
+        except Exception as error:
+            console.print(Text(f"Configuration failed: {error_text(error, cfg.llm.api_key, args.api_key)}", style="red"))
+            return 2
+    elif backend is None and needs_config:
+        console.print(Text("Model is required. Set LLM_MODEL=provider:model-id, llm.model in JSON, or --model provider:model-id. A provider key alone does not select a model." if not model else
+                           "Credential is required for the selected model. Export its provider key or use miniagent --connect.", style="red"))
         return 2
     def approve(name, arguments):
         if not sys.stdin.isatty():
@@ -94,6 +113,27 @@ async def cli_run(args, *, console=None, backend=None):
         answer = await app.arun(query, stream=stream if streaming else None)
         if not chunks:
             console.print(Markdown(answer) if console.is_terminal else Text(answer))
+    async def switch_model(next_model):
+        nonlocal model, cfg
+        next_cfg = load_config(args.config, model_override=next_model, base_override=args.base_url)
+        candidate = LLMBackend(next_model, providers=next_cfg.providers,
+                               api_key=args.api_key or next_cfg.llm.api_key, base_url=next_cfg.llm.api_base,
+                               temperature=args.temperature if args.temperature is not None else next_cfg.llm.temperature)
+        try:
+            if "llm" in app.plugins:
+                await app.unuse("llm")
+        except BaseException:
+            await candidate.aclose()
+            raise
+        def install(ctx):
+            ctx.cleanup(candidate.aclose)
+            ctx.service("llm", candidate)
+        app.use(Plugin("llm", install))
+        await app.start()
+        app.backend = None
+        cfg, model, app.session, app.messages = next_cfg, next_model, new_session(), []
+        app._base_temperature = candidate.temperature
+        app.apply_skill(app.skill)
     try:
         async with app:
             console.print(Text(f"MiniAgent · {model} · {app.policy.workspace}\nSession: {app.session.path}", style="dim"))
@@ -110,7 +150,7 @@ async def cli_run(args, *, console=None, backend=None):
                     if text in {"/q", "/quit", "/exit"}:
                         break
                     if text == "/help":
-                        console.print(Text("/model provider:model · /plugins · /skills [name|path|off]\n/session [new|resolve ID verified-result] · /stream · /help · /q"))
+                        console.print(Text("/connect · /models · /model [provider:model] · /plugins · /skills [name|path|off]\n/session [new|resolve ID verified-result] · /stream · /help · /q"))
                     elif text == "/plugins":
                         console.print(Text(", ".join(app.active)))
                     elif text.startswith("/skills"):
@@ -132,24 +172,15 @@ async def cli_run(args, *, console=None, backend=None):
                             finally:
                                 app.session.close()
                         console.print(Text(str(app.session.path)))
-                    elif text.startswith("/model"):
+                    elif text in {"/connect", "/models"}:
+                        if not sys.stdin.isatty():
+                            raise ValueError("Interactive model configuration requires a TTY")
+                        next_model = await (connect(console, cfg) if text == "/connect" else select_model(console, cfg))
+                        await switch_model(next_model)
+                    elif text == "/model" or text.startswith("/model "):
                         next_model = text.partition(" ")[2].strip()
                         if next_model:
-                            next_cfg = load_config(args.config, model_override=next_model)
-                            candidate = LLMBackend(next_model, providers=next_cfg.providers,
-                                                   api_key=next_cfg.llm.api_key, base_url=next_cfg.llm.api_base,
-                                                   temperature=next_cfg.llm.temperature)
-                            try:
-                                await app.unuse("llm")
-                            except BaseException:
-                                await candidate.aclose()
-                                raise
-                            def install(ctx):
-                                ctx.cleanup(candidate.aclose)
-                                ctx.service("llm", candidate)
-                            app.use(Plugin("llm", install))
-                            await app.start()
-                            model, app.session, app.messages = next_model, new_session(), []
+                            await switch_model(next_model)
                         console.print(Text(model))
                     elif text == "/stream":
                         streaming = not streaming
@@ -161,8 +192,8 @@ async def cli_run(args, *, console=None, backend=None):
                 except EOFError:
                     break
                 except Exception as error:
-                    console.print(Text(f"Error: {type(error).__name__}: {error}", style="red"))
+                    console.print(Text(f"Error: {error_text(error, cfg.llm.api_key, args.api_key)}", style="red"))
             return 0
     except Exception as error:
-        console.print(Text(f"Error: {type(error).__name__}: {error}", style="red"))
+        console.print(Text(f"Error: {error_text(error, cfg.llm.api_key, args.api_key)}", style="red"))
         return 1

@@ -1,172 +1,84 @@
-# AGENTS.md — MiniAgent 项目指南
+# AGENTS.md — MiniAgent 开发与审查约束
 
-## 项目定位
+## 每次 Codex 运行必读
 
-MiniAgent 是一个**极简、透明、强大的 CLI Agent 框架**。
+这是本仓库 AI 协作规则的唯一真源。进入本仓库开发、审查、修复或继续旧任务时，先读取本文件和受影响的现有代码；在其他工作目录操作 MiniAgent 时也应先读取本文件。用户明确指令优先。
 
-**一句话描述**：用 ~400 行核心函数，实现 Claude Code 的编程能力 + Manus 的系统操控能力。
+每次变更都要落实四项原则：**核心简单、DSH 常用能力、易用美观、便于传播**。它们用于取舍、实现、测试和交付，不是宣传口号。CLAUDE.md 只链接本文件，不维护第二份规则。
 
-## 核心原则
+## 项目定位与能力目标
 
-### 1. 极简即力量
-- 核心 Agent 逻辑控制在 ~400 行，初学者 30 分钟可读完
-- 不追求工具数量，追求 `bash + LLM 智能` 的无限组合能力
-- 每一行代码都应该有存在的理由
+MiniAgent 是以插件为核心的轻量 Python Agent Harness。目标是用容易读懂的小内核覆盖 DSH 常用 Agent 场景：模型调用、工具循环、Context/Service、插件生命周期与清理、事件、Skills、MCP 和可恢复会话。
 
-### 2. 透明可控
-- 工具调用过程完全可见（TOOL: xxx ARGS: {...}）
-- 没有黑盒抽象，没有魔法
-- 初学者可以清楚看到 AI Agent 是怎么工作的
+能力必须有可运行示例、测试或真实任务证据。未逐项验证时，不宣称“已实现 DSH 大部分功能”、完整兼容或稳定发布。完整 Fiber 树、HMR、市场、Web 管理台等按实际需求单独评估，避免为对标数量扩大内核。
 
-### 3. bash 是万能工具
-- MiniAgent 不内置 100 个专用工具，而是依赖 bash + LLM 的组合
-- 要截图？LLM 会通过 bash 调用 `python -c "from mss import mss; mss().shot()"`
-- 要控制鼠标？LLM 会通过 bash 调用 pyautogui
-- 要爬网页？LLM 会通过 bash 编写并运行 Python 脚本
-- 这种设计让框架保持极简，同时能力无上限
+## 四项设计原则
 
-### 4. 教学优先
-- 这是"最好的 AI Agent 教科书"
-- 代码结构清晰：agent.py（核心循环）→ tools/（工具集）→ cli.py（交互界面）
-- 支持文本解析和原生 Function Calling 两种模式，便于对比学习
+### 核心简单
 
-### 5. 不做大杂烩
-- 不引入重型依赖（pyautogui/playwright/mss 等不作为内置依赖）
-- 不增加不必要的抽象层
-- 如果一个功能可以通过 bash 实现，就不为它单独建工具
+- 内核只负责 Agent 循环、插件/服务生命周期、统一工具入口与必要运行守卫。模型协议交给 any-llm，传输交给官方 SDK。
+- 优先复用现有函数和配置入口。修复问题先补缺失边界，避免新建平行实现或引入通用框架。
+- CLI、连接配置、显示、低频工具及专题集成放在外围；新能力优先作为插件组合。插件和 Shell 是可信代码，权限检查不等于沙箱。
+- 易读比少几行更重要。禁止压行、藏逻辑、删安全检查或把代码挪到统计之外来满足预算。
+- 四文件核心目标 500–700 物理行；全部官方包 Python 目标 2000–2800 行，超过 3000 行须在 PR 解释差额和迁移计划。现有总量超标是待解决问题，不能改口径宣称完成。
+- 运行 `python scripts/source_stats.py`，分别报告 core、runtime mechanisms、全部包代码的变更前后差额。脚本定义统计边界，不复制另一套计数实现。
 
-## 架构概览
+### DSH 常用能力
 
-```
-miniagent/
-├── agent.py        # 核心 Agent 循环（~400行核心函数）
-│                   # - LLM 客户端初始化
-│                   # - 工具调用解析（文本模式 + 原生 FC 模式）
-│                   # - 流式输出 (_call_llm_stream)
-│                   # - 上下文管理 (_summarize_messages)
-│                   # - 危险命令检测 (_check_dangerous)
-│                   # - 工具执行循环
-│                   # - 消息历史管理
-├── cli.py          # 交互式命令行界面
-│                   # - Rich 美化输出
-│                   # - 流式 token 输出
-│                   # - 工具执行回调显示
-│                   # - 危险命令 Rich 确认弹窗
-│                   # - 会话记忆集成
-├── config.py       # 配置管理（.env / JSON / 环境变量）
-├── logger.py       # 日志配置
-├── memory.py       # 轻量会话记忆（~/.miniagent/memory.json）
-├── mcp_client.py   # MCP 客户端 re-export（→ extensions/）
-├── orchestrator.py # Agent 编排器 re-export（→ extensions/）
-├── skills.py       # Skill 系统（可复用的 Agent 配置）
-│                   # - name + prompt + tool whitelist + temperature
-│                   # - 内置: coder/researcher/reviewer/tester
-├── extensions/
-│   ├── mcp_client.py   # MCP 协议客户端实现
-│   │                   # - stdio JSON-RPC 传输
-│   │                   # - 工具发现 + 调用
-│   │                   # - 自动转为 MiniAgent 工具格式
-│   └── orchestrator.py # Agent 编排器实现
-│                       # - 任务分解（planner agent）
-│                       # - 角色分配（基于 Skill 系统）
-│                       # - 上下文传递
-├── tools/
-│   ├── __init__.py     # 工具注册系统（@register_tool 装饰器）
-│   ├── code_tools.py   # 代码工具：read/write/edit/grep/glob/bash
-│   └── basic_tools.py  # 基础工具：calculator/time/system/browser/clipboard/docx
-└── utils/
-    ├── json_utils.py   # 健壮的 JSON 解析（处理 LLM 输出的各种格式问题）
-    ├── text_utils.py   # 共享文本工具（smart_truncate）
-    └── reflector.py    # 反思机制（可选，用于改善推理质量）
-```
+- 用 Context/Service、依赖声明、插件清理、可替换 Loop 等解决实际 Agent 任务；新增生命周期行为必须说明等待、激活、失活、恢复和异常回滚。
+- 默认优先稳定和显式语义；兼容性变化要说明迁移路径。运行中的任务禁止生命周期变更。
+- 工具仍经 Schema、Policy 和 Skill 检查；会话保留原记录，不重放未知副作用。新能力不得破坏这些守卫。
+- 自定义插件/Loop 的责任和可信边界必须写清楚，不把 Mock 或菜单选项当作真实远端兼容验收。
 
-## Agent 核心循环
+### 易用美观
 
-```
-用户输入
-  ↓
-构建系统提示（含可用工具描述）
-  ↓
-调用 LLM
-  ↓
-解析响应 → 包含工具调用？
-  ├─ 是 → 执行工具 → 结果回传 → 再次调用 LLM（循环）
-  └─ 否 → 返回最终响应
-```
+- 首次成功路径要短：少量清晰选择即可配置模型并开始任务。自动化保持无交互，报错给出可执行提示。
+- 复用 Rich 和既有 CLI 组件；菜单名称、编号、对齐、错误/成功状态保持一致，减少重复标题和冗长日志。不为简单交互新增大型 UI 依赖。
+- 显示内容有界；非 TTY/NO_COLOR 输出可读。秘密不进入日志、报告或连接 JSON；无系统凭据库时明确告知仅在当前进程保留。
+- 用户可见流程改变时验证首次使用、取消、失败降级、模型切换及旧配置行为中受影响的路径。
 
-## 工具调用方式
+### 便于传播
 
-### 文本模式（默认，教学友好）
-LLM 在响应中输出结构化文本，Agent 用正则解析：
-```
-TOOL: bash
-ARGS: {"cmd": "ls -la"}
-```
+- README 只保留定位、短快速开始、核心入口和最小示例；详细边界、排障、协议与迁移放 docs/ 专题文档。
+- 中英文 README 同步评估；不更新其中一份时说明原因。截图、Demo 和性能数字必须可复现，标注版本、环境与局限。
+- 每个能力优先提供一条容易复制的命令或一个短示例；使用明确占位符，不写死密钥、模型 ID、用户路径、端口或环境差异。
+- 推广用语服从证据：alpha、剩余目标和未覆盖平台写清楚，不承诺“能力无限”或未经验证的产品等价。
 
-### 原生 Function Calling 模式（可选，更可靠）
-使用 OpenAI 兼容的 `tools` 参数，模型返回结构化 `tool_calls`。
-通过 `mode="native"` 启用。
+## 目录边界与真源
 
-## 自定义工具
+- miniagent/agent.py、harness.py、llm.py、tools/registry.py：四文件核心；以统计脚本清单为准。
+- policy.py、plugins.py、session.py：外围运行机制；连接配置在 connections.py，CLI 在 cli.py / cli_runtime.py。
+- extensions/：可选集成；legacy.py / legacy_cli.py 及旧工具是兼容路径，删除需独立迁移评审。
+- tests/：确定性回归与显式 opt-in live 测试；scripts/：验证与构建；docs/：专题说明；.claude/reviews/：本地审查产物。
+- 以可执行代码、脚本和工作流为准，发现相关文档漂移要顺手修正。AGENTS.md 不复制完整架构或过期实现。
 
-```python
-from miniagent.tools import register_tool
+## 每次工作顺序
 
-@register_tool
-def my_tool(arg: str) -> str:
-    """我的自定义工具"""
-    return f"处理: {arg}"
-```
+1. 确认任务与影响边界，读取实现、配置、测试、CI 和必要文档；审查先看当前提交的 CI，再补缺口。
+2. 对照四项原则选择最小可行改动；不夹带无关重构、依赖迁移或能力扩张。
+3. 对真实缺陷先复现，再修复，补覆盖实际边界的回归；不写只镜像实现的测试。
+4. 验证对应路径，核对源码差额、配置/凭据边界、用户流程与文档。轻量治理校验不能替代正确性、易用性或代码审查。
+5. 交付说明改了什么、为什么、测试/CI、未验证项、风险和回滚；用户需要的是可审查结果，不是只给计划。
 
-3 行代码即可注册一个新工具。Agent 会自动从函数签名和 docstring 生成工具描述。
-
-## 贡献原则
-
-1. **保持简单** — 新增代码需要有充分理由，优先用现有工具（尤其是 bash）解决问题
-2. **不破坏现有功能** — 所有改动需确保向后兼容
-3. **测试覆盖** — 核心逻辑改动需附带测试
-4. **中英文** — README 维护中英文两个版本
-
-## 测试
+## 验证与协作资产
 
 ```bash
-python -m pytest tests/ -v
+python -m pytest tests -q -m "not live"
+python -m compileall -q miniagent
+python scripts/source_stats.py
+python scripts/check_ai_assets.py
 ```
 
-当前测试覆盖：100+ 测试用例，涵盖工具注册、JSON 解析、技能系统、会话记忆、Agent 初始化等。
+按改动面使用 .github/workflows/ci.yml 的 Ruff、锁定依赖审计、构建及最小独立安装检查。真实 Provider 验收只在明确选择模型和凭据后 opt-in，不输出秘密，不把离线测试算作真实通过。
 
-## Git 工作流
+修改 AGENTS.md、CLAUDE.md 或 PR 模板时执行 `python scripts/check_ai_assets.py`。CLAUDE.md 必须是指向 AGENTS.md 的 Git 软链接；Windows 不支持实体链接时允许 checkout 的链接占位文件，但 Git 模式仍须为 120000。
 
-- **禁止直接 push 到 main 分支**，所有改动需通过 Pull Request 提交
-- PR 需要至少一位 maintainer 审核同意后才能合并
-- 提交信息使用 [Conventional Commits](https://www.conventionalcommits.org/) 格式（`feat:`, `fix:`, `refactor:`, `docs:` 等）
-- 涉及核心逻辑（agent.py, tools/）的改动需附带测试
+## Git 与 PR
 
-## 可配置参数
-
-以下限制参数可通过环境变量或 `.env` 文件覆盖：
-
-| 环境变量 | 默认值 | 说明 |
-|----------|--------|------|
-| `LLM_API_KEY` | — | LLM API 密钥（必需） |
-| `LLM_MODEL` | — | 模型名称（必需） |
-| `LLM_API_BASE` | — | API 基础 URL |
-| `LLM_TEMPERATURE` | 0.7 | LLM 采样温度 |
-| `LLM_ORGANIZATION` | — | OpenAI organization ID |
-| `BASH_TIMEOUT` | 120 | bash 工具默认超时时间（秒） |
-| `BASH_MAX_OUTPUT` | 50000 | bash 输出最大字符数 |
-| `TOOL_RESULT_LIMIT` | 16000 | 工具结果回传给 LLM 的最大字符数 |
-| `MAX_CONTEXT_MESSAGES` | 20 | 超过此数量自动压缩对话历史 |
-| `CONFIRM_DANGEROUS` | true | 是否拦截危险 bash 命令 |
-| `MINIAGENT_STREAM` | 1 | 是否启用流式输出（0=关闭） |
-| `ENABLE_REFLECTION` | false | 是否启用反思机制 |
-| `REFLECTION_MAX_ITERATIONS` | 3 | 反思最大迭代次数 |
-| `SERPAPI_KEY` | — | SerpAPI 密钥（web_search 工具需要） |
-| `LOG_LEVEL` | INFO | 日志级别 |
-| `MINIAGENT_HOME` | ~/.miniagent | 会话记忆存储路径 |
-
-**多供应商别名**: 如果未设置 `LLM_API_KEY`，框架会依次尝试读取 `OPENAI_API_KEY`、`DEEPSEEK_API_KEY`、`ANTHROPIC_API_KEY`、`AZURE_OPENAI_API_KEY` 作为 fallback。详见 `config.py`。
-
-超出限制时使用**头+尾智能截断**（保留 70% 开头 + 30% 结尾），确保错误信息不会因截断丢失。
-
-bash 工具的 `timeout` 参数也可在每次调用时由 LLM 自行指定，例如对安装类命令传入 `timeout=300`。
+- 未经用户明确授权不 commit/tag/push；已授权的修复与 PR 更新继续推进。禁止直接 push main，合并需 maintainer 审核同意。
+- 分支默认 codex/；提交用英文 Conventional Commits，不加 Co-Authored-By；PR 标题描述实际变更。
+- PR 按必要性、相关性、描述/验证证据、正确性、合入条件审查；标题不是单独阻断项。
+- 修复 PR 说明原问题、根因、修复点、回归风险；遵循 .github/PULL_REQUEST_TEMPLATE.md。
+- 行为/配置变更同步专题文档和 docs/CHANGELOG.md。新增环境配置更新 .env.example。Unreleased 条目采用扁平 `- [类型] 描述`，不加三级分类标题。
+- stacked PR 保留依赖顺序，优先 merge commit；更新父分支后同步后继分支并复核 diff。回滚逆序进行，保留会话数据。
+- 不自动发版或打 tag。密钥、用户目录、模型、端口均通过现有配置/参数传递。

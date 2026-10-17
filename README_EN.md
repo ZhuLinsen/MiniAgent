@@ -16,7 +16,9 @@ python -m pip install .
 
 Create `.env` in the project and fill in your provider key and model ID. Replace `<model-id>` below. For Qwen use `dashscope:<model-id>` and `DASHSCOPE_API_KEY`; for Claude use `anthropic:<model-id>` and `ANTHROPIC_API_KEY`.
 
-Select a model explicitly. A key or API URL alone causes the CLI to report a missing model before creating a client. `--model` takes precedence over JSON `llm.model`, then `LLM_MODEL`.
+Alternatively run `miniagent --connect`. An interactive first launch with a missing model or credential opens the guide. In the REPL, `/connect` configures a provider and `/models` selects a model. See [connections and credentials](docs/model-connections.md).
+
+Select a model explicitly. Noninteractive calls with only a key or API URL fail before client creation. Precedence is `--model`, JSON `llm.model`, `LLM_MODEL`, then the saved connection default.
 
 ```dotenv
 DEEPSEEK_API_KEY=your-provider-key
@@ -38,7 +40,7 @@ Writes, Shell and MCP calls require confirmation by default. Noninteractive conf
 - JSONL sessions, context compaction that preserves whole tool groups, and inspection before resuming uncertain effects.
 - Reversible Skill execution whitelists and optional official MCP SDK stdio integration.
 
-CLI commands: `/help`, `/model`, `/plugins`, `/skills`, `/session`, `/stream`. `/plugins` currently lists loaded plugins. `--session <path>` resumes a session; `/session new` creates one. Switching models creates a fresh session.
+CLI commands: `/help`, `/connect`, `/models`, `/model`, `/plugins`, `/skills`, `/session`, `/stream`. `/plugins` currently lists loaded plugins. `--session <path>` resumes a session; `/session new` creates one. Switching models creates a fresh session.
 
 ## Python API
 

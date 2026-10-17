@@ -15,6 +15,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="miniagent")
     parser.add_argument("--version", "-V", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--config", help="Configuration JSON")
+    parser.add_argument("--connect", action="store_true", help="Configure a model interactively and exit")
     parser.add_argument("--model", help="provider:model-id")
     parser.add_argument("--api-key", help="Explicit selected-endpoint credential")
     parser.add_argument("--base-url", help="Explicit OpenAI-compatible endpoint")

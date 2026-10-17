@@ -18,16 +18,18 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install --upgrade pip uv==0.13.0
-      - run: uv sync --locked --extra mcp --extra legacy --python ${{ matrix.python }}
-      - run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy python -m pytest tests -q -m "not live"
-      - run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy python -m compileall -q miniagent
+      - run: uv sync --locked --extra mcp --extra legacy --extra credentials --python ${{ matrix.python }}
+      - name: Project principles and instruction assets
+        run: python scripts/check_ai_assets.py
+      - run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy --extra credentials python -m pytest tests -q -m "not live"
+      - run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy --extra credentials python -m compileall -q miniagent
       - name: Native runtime static checks
-        run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy ruff check --select F miniagent/agent.py miniagent/harness.py miniagent/llm.py miniagent/policy.py miniagent/plugins.py miniagent/cli.py miniagent/cli_runtime.py miniagent/config.py miniagent/logger.py miniagent/tools/registry.py miniagent/extensions/mcp_plugin.py tests/test_runtime_recovery.py tests/test_provider_protocols.py tests/test_cli_runtime.py tests/test_model_selection.py scripts/source_stats.py scripts/minimal_install_smoke.py
+        run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy --extra credentials ruff check --select F miniagent/agent.py miniagent/harness.py miniagent/llm.py miniagent/policy.py miniagent/plugins.py miniagent/cli.py miniagent/cli_runtime.py miniagent/config.py miniagent/connections.py miniagent/logger.py miniagent/tools/registry.py miniagent/extensions/mcp_plugin.py tests/test_runtime_recovery.py tests/test_provider_protocols.py tests/test_cli_runtime.py tests/test_model_selection.py tests/test_connections.py tests/conftest.py scripts/source_stats.py scripts/minimal_install_smoke.py
       - name: Export locked production dependencies
-        run: uv export --locked --no-dev --extra mcp --extra legacy --no-emit-project --output-file audit-requirements.txt
+        run: uv export --locked --no-dev --extra mcp --extra legacy --extra credentials --no-emit-project --output-file audit-requirements.txt
       - name: Audit production dependencies
-        run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy pip-audit --disable-pip --no-deps -r audit-requirements.txt
-      - run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy python scripts/source_stats.py
+        run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy --extra credentials pip-audit --disable-pip --no-deps -r audit-requirements.txt
+      - run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy --extra credentials python scripts/source_stats.py
       - run: uv build
       - name: Minimal installed wheel without optional extras
-        run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy python scripts/minimal_install_smoke.py
+        run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra legacy --extra credentials python scripts/minimal_install_smoke.py
