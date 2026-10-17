@@ -1,8 +1,7 @@
 """Tests for the Skill system in miniagent/skills.py."""
 
-import pytest
 from dataclasses import fields as dataclass_fields
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
 
 from miniagent.skills import Skill, register_skill, get_skill, list_skills
 
@@ -55,39 +54,21 @@ class TestSkillRegistry:
         assert "bash" in coder.tools
 
 
-class TestAgentLoadSkill:
-    def test_load_skill_changes_prompt_and_filters_tools(self):
-        from miniagent.agent import MiniAgent
+class TestHarnessSkill:
+    def test_skill_changes_prompt_and_filters_tools(self):
+        from miniagent import Harness, Tool
+        app = Harness(system_prompt="original")
+        for name in ("read", "bash", "calculator"):
+            app.registry.add(Tool(name, name, {"type": "object"}, lambda: None))
+        app.apply_skill(get_skill("coder"))
+        assert app.system_prompt != "original"
+        assert {t["function"]["name"] for t in app.registry.schemas()} == {"read", "bash"}
 
-        with patch.object(MiniAgent, '_init_llm_client'):
-            agent = MiniAgent(model="test", api_key="fake", system_prompt="original")
-            agent.client = MagicMock()
-            agent.tools = [
-                {"name": "read", "description": "read", "parameters": {}, "executor": lambda: None},
-                {"name": "bash", "description": "bash", "parameters": {}, "executor": lambda: None},
-                {"name": "calculator", "description": "calc", "parameters": {}, "executor": lambda: None},
-            ]
-            result = agent.load_skill("coder")
-
-            assert result is True
-            assert agent.system_prompt != "original"
-            remaining = {t["name"] for t in agent.tools}
-            assert remaining == {"read", "bash"}
-
-    def test_load_skill_returns_false_for_unknown(self):
-        from miniagent.agent import MiniAgent
-
-        with patch.object(MiniAgent, '_init_llm_client'):
-            agent = MiniAgent(model="test", api_key="fake")
-            agent.client = MagicMock()
-            assert agent.load_skill("nonexistent_xyz") is False
-
-    def test_load_skill_updates_temperature(self):
-        from miniagent.agent import MiniAgent
-
-        with patch.object(MiniAgent, '_init_llm_client'):
-            agent = MiniAgent(model="test", api_key="fake", temperature=0.9)
-            agent.client = MagicMock()
-            agent.tools = []
-            agent.load_skill("coder")
-            assert agent.temperature == 0.3
+    def test_skill_updates_temperature(self):
+        from miniagent import Harness
+        backend = SimpleNamespace(temperature=0.9)
+        app = Harness(backend, temperature=0.9)
+        app.apply_skill(get_skill("coder"))
+        assert backend.temperature == 0.3
+        app.apply_skill(None)
+        assert backend.temperature == 0.9

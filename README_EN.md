@@ -75,7 +75,7 @@ Replace `provider:model-id` with your selected model and configure its credentia
 
 ## Size and scope
 
-Current version: **0.2.0a1 / alpha**. This branch has a 598-line core and 5,148 lines across the package, including a replaceable Loop and opt-in reactive plugins. Teaching APIs and compatibility tools still contribute substantially, and the total-source reduction target remains open. See [project status](docs/project-status.md) for counting rules, a DSH comparison, evidence and next steps.
+This branch is a **0.3.0a1 / alpha candidate**: a 591-line core and 2,122 lines across the package, including a replaceable Loop and opt-in reactive plugins. The original version is preserved on a separate branch; the new package focuses on native APIs. Read the [migration guide](docs/legacy-migration.md) before upgrading. See [project status](docs/project-status.md) for counting rules, a DSH comparison, evidence and next steps.
 
 Type `/help` for commands; use `--session <path>` to resume. Shell, Python plugins and MCP servers are trusted code; tool authorization is not a container sandbox. See [runtime and migration guidance](docs/lean-harness.md) for permissions, recovery and legacy API boundaries.
 

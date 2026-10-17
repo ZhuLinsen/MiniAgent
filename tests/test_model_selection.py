@@ -57,6 +57,13 @@ def test_unprefixed_model_does_not_borrow_unrelated_key(monkeypatch):
     assert load_config().llm.api_key is None
 
 
+def test_unprefixed_model_does_not_guess_provider_from_endpoint(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "unrelated-key")
+    monkeypatch.setenv("LLM_MODEL", "fixture")
+    monkeypatch.setenv("LLM_API_BASE", "https://deepseek.invalid/v1")
+    assert load_config().llm.api_key is None
+
+
 def test_explicit_compatibility_credentials_are_preserved(monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "gateway-key")
     cfg = load_config(model_override="openai:fixture", base_override="https://gateway.invalid/v6")
@@ -72,9 +79,9 @@ def test_invalid_and_blank_models(tmp_path):
     assert load_config(model_override="  ").llm.model == ""
 
 
-def test_legacy_missing_model_fails_before_client(tmp_path, monkeypatch):
-    from miniagent import legacy_cli
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "private-fixture-key")
+def test_legacy_flag_reports_migration_before_client(capsys):
+    from miniagent.cli import main
     with pytest.raises(SystemExit) as error:
-        legacy_cli._build_agent(options(tmp_path, model=None))
+        main(["--legacy"])
     assert error.value.code == 2
+    assert "codex/legacy-pre-harness" in capsys.readouterr().err

@@ -1,4 +1,4 @@
-"""Instance-owned tools. The decorator registry is only a declaration catalog."""
+"""Instance-owned tools with Schema, Skill and Policy checks before execution."""
 import inspect
 from dataclasses import dataclass
 from typing import Callable

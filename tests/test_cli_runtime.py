@@ -84,23 +84,6 @@ def test_config_file_does_not_reuse_wrong_provider_key(tmp_path, monkeypatch):
     assert load_config(str(path)).llm.api_key is None
 
 
-def test_legacy_native_uses_core_loop():
-    from types import SimpleNamespace as NS
-    from unittest.mock import Mock, patch
-    from miniagent import MiniAgent
-    with patch.object(MiniAgent, "_init_llm_client"):
-        agent = MiniAgent("test", "fake")
-    call = NS(id="one", function=NS(name="add", arguments='{"n":2}'))
-    first = NS(content=None, tool_calls=[call])
-    last = NS(content="done", tool_calls=[])
-    agent.client = Mock()
-    agent.client.chat.completions.create.side_effect = [NS(choices=[NS(message=first)]), NS(choices=[NS(message=last)])]
-    agent.add_tool({"name": "add", "description": "add", "executor": lambda n: n + 1})
-    assert agent.run("go", mode="native") == "done"
-    messages = agent.client.chat.completions.create.call_args.kwargs["messages"]
-    assert any(m.get("tool_call_id") == "one" and m["content"] == "3" for m in messages)
-
-
 def test_cli_shows_failed_exit_and_bounded_parameters(tmp_path):
     import json
     import sys

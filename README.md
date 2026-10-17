@@ -75,7 +75,7 @@ asyncio.run(main())
 
 ## 小到哪里，做到哪里
 
-当前为 **0.2.0a1 / alpha**。本分支核心 598 行、全部包源码 5,148 行，包含可替换 Loop 与可选响应式插件。旧教学 API 和兼容工具仍占较大比例，整体精简目标尚未达成。统计口径、DSH 对照、测试证据与后续工作见 [项目状态](docs/project-status.md)。
+本分支为 **0.3.0a1 / alpha 候选**：核心 591 行，全部包源码 2,122 行，包含可替换 Loop 与可选响应式插件。旧版已保存在独立分支，新版集中原生 API；升级前请阅读 [迁移说明](docs/legacy-migration.md)。统计口径、DSH 对照、测试证据与后续工作见 [项目状态](docs/project-status.md)。
 
 CLI 输入 `/help` 查看命令；`--session <path>` 恢复会话。Shell、Python 插件和 MCP 服务属于可信代码，工具授权不提供容器沙箱。权限、恢复和旧 API 的边界见 [使用与迁移指南](docs/lean-harness.md)。
 
