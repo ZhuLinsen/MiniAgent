@@ -10,12 +10,15 @@ from __future__ import annotations
 from typing import Any
 
 from .agent import MiniAgent
+from .harness import Harness, Plugin
 from .skills import Skill, register_skill, get_skill, list_skills
 
 __version__ = "0.1.0"
 
 __all__ = [
     "MiniAgent",
+    "Harness",
+    "Plugin",
     "Orchestrator",
     "load_mcp_tools",
     "Skill",
