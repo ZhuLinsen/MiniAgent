@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/miniagent-banner.svg" width="800" alt="MiniAgent — a minimal Python Agent + Harness">
+  <img src="docs/assets/miniagent-banner.svg" width="800" alt="MiniAgent">
 </p>
 
-<p align="center"><strong>A minimal Python Agent + Harness.</strong><br>A few hundred lines at the core. Read it, change it, run it in your terminal.</p>
+<p align="center"><strong>Python Agent + Harness. A 531-line core.</strong></p>
 
 <p align="center">
   <a href="https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml"><img src="https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -11,19 +11,23 @@
   <img src="https://img.shields.io/badge/status-alpha-ff815c" alt="Alpha">
 </p>
 
-<p align="center"><a href="README.md">中文</a> · <a href="#quick-start">Quick start</a> · <a href="#build-your-own-agent">Python API</a> · <a href="#read-the-core">Read the source</a></p>
+<p align="center"><a href="README.md">中文</a> · <a href="#quick-start">Quick start</a> · <a href="#demos">Demos</a> · <a href="#python-api">Python API</a></p>
 
-**A 531-line core for an agent that reads code, edits files and runs tests.** MiniAgent is both a ready-to-use terminal coding assistant and a small Harness you can embed in Python. Compose your own models, tools, plugins and sessions.
+MiniAgent is a Python agent for reading and editing code, running tests and using local programs through Shell. It can also work on browser, document and file-management tasks.
 
-## Why MiniAgent?
+Use it from the terminal, or embed its Harness in Python to manage models, tools, plugins and sessions. The core is 531 lines, with the model calls, tool loop and plugin lifecycle available to read and change.
 
-- **Small and readable**: just 4 Python files at the core. Follow the model calls, tool loop and plugin lifecycle in the source.
-- **Ready to work**: 6 coding tools, multi-turn tasks, streamed answers and resumable sessions for everyday code inspection, editing and validation.
-- **Easy to extend**: mount tools and services with plugins, specialize tasks with Skills, and connect external capabilities through MCP.
+## Features
+
+- **Code and files**: six tools — `read`, `write`, `edit`, `grep`, `glob`, `bash` — for inspecting code, changing files and running commands.
+- **Local automation**: run Python scripts or installed programs through Shell to open pages, generate documents and organize files. Desktop operations can use additional scripts or MCP servers.
+- **Models and sessions**: model connections, streamed answers, saved sessions, resume and context compaction.
+- **Plugins**: register tools and shared services, subscribe to model/tool events, and manage resource setup and cleanup.
+- **Skills / MCP**: switch task instructions and tool access, and connect external MCP tools.
 
 ## Quick start
 
-Requires **Python 3.11+**. Install from source in a virtual environment:
+Requires Python 3.11+. Install in a virtual environment:
 
 ```bash
 git clone https://github.com/ZhuLinsen/MiniAgent.git
@@ -32,37 +36,43 @@ python -m pip install -e ".[credentials]"
 miniagent
 ```
 
-On the first launch, choose a model and enter its key. Use `/connect` to configure connections and `/models` to switch models. See [model setup](docs/model-connections.md) for environment variables and custom endpoints.
+The first launch guides you through model and credential setup. Then enter a task. File changes and Shell calls require confirmation by default.
 
-Let it inspect your project:
+Start with a read-only inspection:
 
 ```bash
-miniagent --policy readonly --prompt "Read the project structure and find its entry points and test commands"
+miniagent --policy readonly --prompt "Explain this project and find its main code and tests"
 ```
 
-## Use it as a coding Agent
+Use `/help` for commands, `/models` to switch models, `/skills reviewer` for code review and `/session` for the current session. See [model setup](docs/model-connections.md) for environment variables and custom endpoints.
 
-| Capability | What you can do |
-| --- | --- |
-| Six coding tools | Find code with `read` / `grep` / `glob`, change files with `write` / `edit`, run commands and tests with `bash` |
-| Multi-turn execution | The model calls tools, reads results and continues the task, with streamed answers and tool progress |
-| Resumable sessions | Save conversations and tool records; continue with `--session <path>`; compact context as conversations grow |
-| Skills & MCP | Switch task instructions and tool access; connect your own MCP tool servers |
+## Demos
 
-File changes and Shell calls require confirmation by default. Type `/help` for commands, `/skills reviewer` to switch to code review and `/session` for the current session.
+### Windows: browser search
 
-<details>
-<summary>See an actual run: read code → fix a function → run tests</summary>
+> Open the browser, then search for the MiniAgent GitHub repository on Google.
 
-![MiniAgent reading code, editing a function and running tests](docs/assets/coding-session.png)
+<img src="resource/miniagent_chrome.gif" alt="Windows browser automation demo" width="100%"/>
+
+### Windows: create a Word document
+
+> Write a 500-word overview of AI agents in Word and format it.
+
+<img src="resource/miniagent_word.gif" alt="Windows Word automation demo" width="100%"/>
+
+These two recordings are from the original Windows version. The current version uses Shell / Python or MCP for local automation; see [Windows setup and dependencies](docs/demo.md#windows-案例).
+
+### Edit code and run tests
+
+> Fix the addition function in calculator.py, leave the test file unchanged, then run the tests.
+
+![MiniAgent editing a function and running tests](docs/assets/coding-session.png)
 
 [Full recording and reproduction steps](docs/demo.md)
 
-</details>
+## Python API
 
-## Build your own Agent
-
-Harness manages model calls, tool execution and plugin lifecycles. Use it as an ordinary Python library in your script or application:
+Call Harness directly without the terminal interface:
 
 ```python
 from miniagent import Harness
@@ -74,36 +84,27 @@ app.use(coding_tools())
 print(app.run("Read the project structure and explain its entry points"))
 ```
 
-Replace `provider:model-id` with your model and configure its credential. Use `load_config()` to reuse CLI connection settings. Inside an async application, use `async with app` and `await app.arun(...)`.
+Replace `provider:model-id` with your model and configure its credential. In an async application, use `async with app` and `await app.arun(...)`.
 
-Compose your own capabilities with `Plugin`:
+Use `Plugin` to register tools, services, events and cleanup callbacks. Plugins start in dependency order, roll back failed startup and clean up in reverse order. See [Harness and plugins](docs/lean-harness.md).
 
-| Plugin API | Purpose |
+## Source
+
+The core lives in 4 files:
+
+| File | Contents |
 | --- | --- |
-| `ctx.tool(...)` | Mount tools with shared argument validation, authorization and Skill restrictions |
-| `ctx.service(...)` | Provide services for other plugins |
-| `ctx.on(...)` | Subscribe to model and tool events for progress displays or logging |
-| `ctx.cleanup(...)` | Register resource cleanup for exit and failures |
-
-Plugins support dependency ordering, startup rollback and reverse cleanup. See the [guide](docs/lean-harness.md) for custom tools, MCP, Skills and persistent sessions.
-
-## Read the core
-
-Start with these 4 files:
-
-| File | Responsibility |
-| --- | --- |
-| [agent.py](miniagent/agent.py) | The model → tool → model task loop |
+| [agent.py](miniagent/agent.py) | Agent loop: call the model, execute tools and return results |
 | [harness.py](miniagent/harness.py) | Plugins, services, events and lifecycles |
 | [llm.py](miniagent/llm.py) | Model calls and streamed responses |
 | [registry.py](miniagent/tools/registry.py) | Tool registration, argument validation and authorization |
 
-The four-file core totals **531 lines**. CLI, tools, configuration and legacy compatibility code are counted separately. Counts include comments and blank lines and exclude third-party dependencies. Verify with `python scripts/source_stats.py`; see [counting details](docs/project-status.md).
+The core totals **531 lines**. CLI, tools, configuration and legacy compatibility code are counted separately. Counts include comments and blank lines and exclude third-party dependencies. Run `python scripts/source_stats.py` to verify. [Counting details](docs/project-status.md)
 
-## Docs
+## Docs and contributing
 
-[Guide](docs/lean-harness.md) · [Model setup](docs/model-connections.md) · [Changelog](docs/CHANGELOG.md) · [Contributing rules](AGENTS.md)
+[Guide](docs/lean-harness.md) · [Model setup](docs/model-connections.md) · [Demo notes](docs/demo.md) · [Changelog](docs/CHANGELOG.md)
 
-Currently Alpha. Shell, plugins and MCP servers are trusted code; tool authorization does not provide a container sandbox.
+Issues, task examples and pull requests are welcome. Read [AGENTS.md](AGENTS.md) before contributing. Currently Alpha. Shell, plugins and MCP servers can operate on the host; permission prompts do not provide sandbox isolation.
 
 [Apache License 2.0](LICENSE)
