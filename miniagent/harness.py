@@ -47,6 +47,7 @@ class Scope:
 class Harness:
     def __init__(self, backend=None, *, model=None, providers=None, api_key=None,
                  base_url=None, temperature=None, policy=None,
+                 session=None, context_budget=32768,
                  system_prompt="You are a helpful assistant."):
         self.services, self.events, self.plugins, self.active = {}, {}, {}, {}
         self.registry = Registry()
@@ -54,6 +55,7 @@ class Harness:
         self.system_prompt, self.backend = system_prompt, backend
         self.messages = []
         self.busy = False
+        self.session, self.context_budget = session, context_budget
         if model:
             from .llm import llm_plugin
             self.use(llm_plugin(model, providers=providers, api_key=api_key,
@@ -140,11 +142,23 @@ class Harness:
         self._idle()
         self.busy = True
         try:
+            if self.session:
+                self.session.open()
+                if self.session.uncertain:
+                    raise RuntimeError("Session has uncertain tool results; inspect and resolve them first")
+                self.messages = self.session.messages
             await self._start()
             from .agent import agent_loop
             return await agent_loop(self, query, max_steps=max_steps, stream=stream)
         finally:
             self.busy = False
+            if self.session:
+                self.session.close()
+
+    def record(self, message, *, tool=False):
+        if self.session:
+            self.session.append("tool_completed" if tool else "message", message=message)
+        self.messages.append(message)
 
     def run(self, query, **kwargs):
         try:

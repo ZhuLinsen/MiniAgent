@@ -54,3 +54,21 @@ use compatibility mode. Native provider clients retain SDK retry behavior;
 custom endpoints disable retries. The loop never retries tools or interrupted
 streams. `temperature=None` leaves provider defaults unchanged.
 Run live tests with `MINIAGENT_TEST_MODEL` and `python -m pytest -m live -v`.
+
+## Sessions
+
+Pass `Session(path)` to Harness. JSONL events have version/sequence fields;
+unsupported versions and corrupt complete lines fail explicitly. An incomplete
+last line is discarded under an OS writer lock. Original messages and effects
+remain on disk; protect Session files as sensitive user data.
+
+Interrupted started tools are uncertain: inspect their actual effects, then use
+`session.open(); session.resolve(call_id, verified_result); session.close()`.
+The runtime refuses new turns until uncertainty is resolved, and never replays
+tools during restore. Calls not yet started get an interrupted result.
+
+`MINIAGENT_CONTEXT_BUDGET` includes schemas and output reserve. UTF-8 bytes are
+used as a conservative token estimate, not an exact provider tokenizer.
+Compaction retains whole recent turns, summarizes old data with no tools, and
+falls back to an explicit omission notice. An oversized current turn errors
+instead of splitting a tool group. Long-term Memory remains legacy-only.
