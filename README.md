@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/miniagent-banner.svg" width="800" alt="MiniAgent — Python 原生的迷你 Harness + Agent">
+  <img src="docs/assets/miniagent-banner.svg" width="800" alt="MiniAgent — 极简 Python Agent + Harness">
 </p>
 
-<p align="center"><strong>小内核，能干活。</strong><br>Python 原生的迷你 Harness + 编程 Agent。读得懂，改得动，终端里直接用。</p>
+<p align="center"><strong>极简 Python Agent + Harness。</strong><br>几百行核心代码。读得懂，改得动，终端里直接用。</p>
 
 <p align="center">
   <a href="https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml"><img src="https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -11,78 +11,99 @@
   <img src="https://img.shields.io/badge/status-alpha-ff815c" alt="Alpha">
 </p>
 
-<p align="center"><a href="README_EN.md">English</a> · <a href="#快速开始">快速开始</a> · <a href="docs/lean-harness.md">使用指南</a> · <a href="docs/project-status.md">能力与代码量</a></p>
+<p align="center"><a href="README_EN.md">English</a> · <a href="#快速开始">快速开始</a> · <a href="#搭建自己的-agent">Python API</a> · <a href="#读懂核心">读源码</a></p>
 
-MiniAgent 把模型、工具循环、插件、Skills、MCP 和会话恢复组合成一个小型 Python Agent。你可以直接用它读代码、修改文件和运行测试，也可以把 Harness 嵌入自己的应用，用插件增加能力。
+**591 行核心代码，一个能读代码、改文件、跑测试的 Agent。** MiniAgent 既是开箱可用的终端编程助手，也是可以嵌入 Python 的小型 Harness：模型、工具、插件和会话，由你组合。
 
-设计受 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 启发：小内核负责运行，能力通过插件组合。适合希望理解、定制和分享 Agent 的 Python 开发者。
+## 为什么选择 MiniAgent？
 
-## 看它完成一个任务
-
-![MiniAgent 真实运行：读取代码、修复加法函数并执行测试](docs/assets/coding-session.png)
-
-2026-10-17，Windows / Python 3.12，Anspire `qwen3.5-flash`：真实 API、真实文件工具、真实 Shell 测试。测试文件保持不变。图片由真实 CLI 输出导出渲染；这是一个小型修复任务，复现步骤与原始记录见 [演示说明](docs/demo.md)。
+- **小而透明**：核心只有 4 个 Python 文件，模型调用、工具循环和插件生命周期都能顺着源码读懂。
+- **拿来就用**：6 个编程工具、多轮对话、流式回答、会话恢复，覆盖日常代码阅读、修改和验证。
+- **容易扩展**：用插件挂载工具和服务，用 Skills 定制任务，用 MCP 接入外部能力，搭出自己的 Agent。
 
 ## 快速开始
 
-需要 **Python 3.11+**，从当前源码安装：
+需要 **Python 3.11+**，在虚拟环境中从源码安装：
 
 ```bash
 git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
-python -m pip install ".[credentials]"
+python -m pip install -e ".[credentials]"
 miniagent
 ```
 
-第一次交互启动时，按提示选择服务商、填写密钥和模型 ID。密钥可保存在受支持的系统凭据库；不可用时仅保留在当前进程。已配置用户可以用 `/connect` 增加连接、`/models` 切换模型。详见 [连接配置](docs/model-connections.md)。
+首次启动按提示选择模型、输入密钥，即可开始。之后可用 `/connect` 配置连接、`/models` 切换模型；环境变量与自定义接口见 [模型配置](docs/model-connections.md)。
 
-默认会询问是否允许修改文件或调用 Shell。开始前可先做只读检查：
+先让它看看你的项目：
 
 ```bash
-miniagent --policy readonly --prompt "检查当前项目结构，说明主要入口"
+miniagent --policy readonly --prompt "阅读项目结构，找出主要入口和测试命令"
 ```
 
-自动化可以通过环境变量、JSON 或 CLI 明确配置模型；安装 MCP 使用 `python -m pip install ".[mcp]"`。更多选项运行 `miniagent --help`。
+## 直接当编程 Agent 用
 
-## 一个 Agent 需要的常用能力
-
-| 能力 | MiniAgent 的用法 |
+| 能力 | 你可以用它做什么 |
 | --- | --- |
-| 模型与工具循环 | 多 Provider、原生工具调用、流式文本 |
-| 编程工具 | `read`、`write`、`edit`、`grep`、`glob`、`bash` |
-| 插件组合 | Context/Service、依赖声明、事件、失败回滚、自动清理、可替换 Loop 与可选响应式生命周期 |
-| Skills 与 MCP | 切换提示和工具白名单，连接 MCP stdio 服务 |
-| 可恢复会话 | JSONL 记录、上下文压缩，不确定副作用先核实再恢复 |
-| 终端交互 | 模型连接向导、工具进度、Markdown 回答和会话命令 |
+| 六个编程工具 | `read` / `grep` / `glob` 找代码，`write` / `edit` 改文件，`bash` 跑命令和测试 |
+| 多轮执行 | 模型调用工具、读取结果、继续处理任务；支持流式回答和工具进度 |
+| 会话恢复 | 保存对话与工具记录，用 `--session <path>` 接着处理；长对话自动压缩上下文 |
+| Skills 与 MCP | 切换任务提示和工具范围，连接自己的 MCP 工具服务 |
 
-## 也可以写进 Python
+默认在修改文件或执行 Shell 前询问。输入 `/help` 查看命令，`/skills reviewer` 切换到代码审查角色，`/session` 查看当前会话。
+
+<details>
+<summary>看一次实际运行：读代码 → 修复函数 → 跑测试</summary>
+
+![MiniAgent 读取代码、修改函数并运行测试](docs/assets/coding-session.png)
+
+[完整记录与复现步骤](docs/demo.md)
+
+</details>
+
+## 搭建自己的 Agent
+
+Harness 管理模型调用、工具执行和插件生命周期。把它当作普通 Python 库，在脚本或应用里组合：
 
 ```python
-import asyncio
 from miniagent import Harness
 from miniagent.plugins import coding_tools
 from miniagent.policy import Policy
 
-async def main():
-    async with Harness(model="provider:model-id", policy=Policy(mode="readonly")) as app:
-        app.use(coding_tools())
-        print(await app.arun("检查项目结构，说明主要入口"))
-
-asyncio.run(main())
+app = Harness(model="provider:model-id", policy=Policy(mode="readonly"))
+app.use(coding_tools())
+print(app.run("阅读项目结构，说明主要入口"))
 ```
 
-将 `provider:model-id` 换为你选择的模型，并配置对应凭据。自定义工具、服务和事件通过 `Plugin` 挂载，见 [插件示例与运行指南](docs/lean-harness.md)。
+将 `provider:model-id` 换为你的模型，并配置对应凭据；也可通过 `load_config()` 复用 CLI 的连接配置。已有异步应用中使用 `async with app` 和 `await app.arun(...)`。
 
-## 小到哪里，做到哪里
+用 `Plugin` 组合自己的能力：
 
-本分支为 **0.3.0a1 / alpha 候选**：核心 591 行，全部包源码 2,122 行，包含可替换 Loop 与可选响应式插件。旧版已保存在独立分支，新版集中原生 API；升级前请阅读 [迁移说明](docs/legacy-migration.md)。统计口径、DSH 对照、测试证据与后续工作见 [项目状态](docs/project-status.md)。
+| 插件入口 | 用途 |
+| --- | --- |
+| `ctx.tool(...)` | 挂载自定义工具，复用参数校验、权限和 Skill 限制 |
+| `ctx.service(...)` | 提供供其他插件使用的服务 |
+| `ctx.on(...)` | 订阅模型与工具事件，接入进度展示或日志 |
+| `ctx.cleanup(...)` | 注册退出与失败时的资源清理 |
 
-CLI 输入 `/help` 查看命令；`--session <path>` 恢复会话。Shell、Python 插件和 MCP 服务属于可信代码，工具授权不提供容器沙箱。权限、恢复和旧 API 的边界见 [使用与迁移指南](docs/lean-harness.md)。
+插件支持依赖顺序、失败回滚和逆序清理。自定义工具、MCP、Skills 与持久会话示例见 [使用指南](docs/lean-harness.md)。
 
-## 参与和致谢
+## 读懂核心
 
-欢迎提交可复现的问题、短小插件和真实任务案例。开发约束见 [AGENTS.md](AGENTS.md)，版本变化见 [Changelog](docs/CHANGELOG.md)。
+从这 4 个文件开始：
 
-编程工具参考 [nanocode](https://github.com/1rgs/nanocode)，模型适配使用 [any-llm](https://github.com/mozilla-ai/any-llm)，MCP 使用官方 Python SDK。Logo 延续作者 [AlphaEvo](https://github.com/ZhuLinsen/alphaevo) 的终端视觉风格。
+| 文件 | 职责 |
+| --- | --- |
+| [agent.py](miniagent/agent.py) | 模型 → 工具 → 模型的任务循环 |
+| [harness.py](miniagent/harness.py) | 插件、服务、事件与生命周期 |
+| [llm.py](miniagent/llm.py) | 模型调用与流式响应 |
+| [registry.py](miniagent/tools/registry.py) | 工具注册、参数校验与授权入口 |
+
+四文件核心 **591 行**，全部包 Python **2,122 行**（含 CLI、工具和配置）。 统计包含注释和空行，不含第三方依赖；运行 `python scripts/source_stats.py` 可复核，完整口径见 [代码量说明](docs/project-status.md)。
+
+## 文档
+
+[使用指南](docs/lean-harness.md) · [模型配置](docs/model-connections.md) · [版本变化](docs/CHANGELOG.md) · [开发约束](AGENTS.md)
+
+当前为 Alpha。旧版升级请先阅读 [迁移说明](docs/legacy-migration.md)。Shell、插件和 MCP 服务是可信代码，工具授权不提供容器沙箱。
 
 [Apache License 2.0](LICENSE)

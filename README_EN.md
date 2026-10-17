@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/miniagent-banner.svg" width="800" alt="MiniAgent — a Python-native mini harness + agent">
+  <img src="docs/assets/miniagent-banner.svg" width="800" alt="MiniAgent — a minimal Python Agent + Harness">
 </p>
 
-<p align="center"><strong>Small core. Real work.</strong><br>A Python-native mini harness + coding agent. Read it, change it, run it in your terminal.</p>
+<p align="center"><strong>A minimal Python Agent + Harness.</strong><br>A few hundred lines at the core. Read it, change it, run it in your terminal.</p>
 
 <p align="center">
   <a href="https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml"><img src="https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -11,78 +11,99 @@
   <img src="https://img.shields.io/badge/status-alpha-ff815c" alt="Alpha">
 </p>
 
-<p align="center"><a href="README.md">中文</a> · <a href="#quick-start">Quick start</a> · <a href="docs/lean-harness.md">Guide</a> · <a href="docs/project-status.md">Capabilities & source size</a></p>
+<p align="center"><a href="README.md">中文</a> · <a href="#quick-start">Quick start</a> · <a href="#build-your-own-agent">Python API</a> · <a href="#read-the-core">Read the source</a></p>
 
-MiniAgent combines models, a tool loop, plugins, Skills, MCP and resumable sessions in a small Python agent. Use it to inspect code, edit files and run tests, or embed the Harness in your application and add capabilities through plugins.
+**A 591-line core for an agent that reads code, edits files and runs tests.** MiniAgent is both a ready-to-use terminal coding assistant and a small Harness you can embed in Python. Compose your own models, tools, plugins and sessions.
 
-Inspired by [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): keep the runtime small and compose capabilities through plugins. Built for Python developers who want to understand, customize and share their agents.
+## Why MiniAgent?
 
-## Watch it finish a task
-
-![Actual MiniAgent run: read code, fix an addition function, run tests](docs/assets/coding-session.png)
-
-2026-10-17, Windows / Python 3.12, Anspire `qwen3.5-flash`: a real API, file tools and Shell test run. The test file was unchanged. This image renders the actual recorded CLI output. It demonstrates a small repair task; see [the transcript and reproduction steps](docs/demo.md).
+- **Small and readable**: just 4 Python files at the core. Follow the model calls, tool loop and plugin lifecycle in the source.
+- **Ready to work**: 6 coding tools, multi-turn tasks, streamed answers and resumable sessions for everyday code inspection, editing and validation.
+- **Easy to extend**: mount tools and services with plugins, specialize tasks with Skills, and connect external capabilities through MCP.
 
 ## Quick start
 
-Requires **Python 3.11+**. Install from the current source:
+Requires **Python 3.11+**. Install from source in a virtual environment:
 
 ```bash
 git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
-python -m pip install ".[credentials]"
+python -m pip install -e ".[credentials]"
 miniagent
 ```
 
-On your first interactive launch, choose a provider, enter its key and select a model ID. Keys can use a supported OS credential vault; without one, they remain in memory for the current process. Use `/connect` to add connections and `/models` to switch models. See [connection setup](docs/model-connections.md).
+On the first launch, choose a model and enter its key. Use `/connect` to configure connections and `/models` to switch models. See [model setup](docs/model-connections.md) for environment variables and custom endpoints.
 
-Writes and Shell calls require confirmation by default. Start with a read-only inspection:
+Let it inspect your project:
 
 ```bash
-miniagent --policy readonly --prompt "Inspect the project structure and explain its entry points"
+miniagent --policy readonly --prompt "Read the project structure and find its entry points and test commands"
 ```
 
-For automation, explicitly configure a model through environment variables, JSON or CLI arguments. Install MCP with `python -m pip install ".[mcp]"`. Run `miniagent --help` for options.
+## Use it as a coding Agent
 
-## The everyday agent toolkit
-
-| Capability | In MiniAgent |
+| Capability | What you can do |
 | --- | --- |
-| Models & tool loop | Multiple providers, native tool calls and streamed text |
-| Coding tools | `read`, `write`, `edit`, `grep`, `glob`, `bash` |
-| Plugin composition | Context/Service, dependencies, events, rollback, cleanup, a replaceable Loop and opt-in reactive lifecycle |
-| Skills & MCP | Switch prompts and tool allowlists; connect MCP stdio servers |
-| Resumable sessions | JSONL history, context compaction, inspection before resuming uncertain effects |
-| Terminal interface | Connection guide, tool progress, Markdown answers and session commands |
+| Six coding tools | Find code with `read` / `grep` / `glob`, change files with `write` / `edit`, run commands and tests with `bash` |
+| Multi-turn execution | The model calls tools, reads results and continues the task, with streamed answers and tool progress |
+| Resumable sessions | Save conversations and tool records; continue with `--session <path>`; compact context as conversations grow |
+| Skills & MCP | Switch task instructions and tool access; connect your own MCP tool servers |
 
-## Use it from Python
+File changes and Shell calls require confirmation by default. Type `/help` for commands, `/skills reviewer` to switch to code review and `/session` for the current session.
+
+<details>
+<summary>See an actual run: read code → fix a function → run tests</summary>
+
+![MiniAgent reading code, editing a function and running tests](docs/assets/coding-session.png)
+
+[Full recording and reproduction steps](docs/demo.md)
+
+</details>
+
+## Build your own Agent
+
+Harness manages model calls, tool execution and plugin lifecycles. Use it as an ordinary Python library in your script or application:
 
 ```python
-import asyncio
 from miniagent import Harness
 from miniagent.plugins import coding_tools
 from miniagent.policy import Policy
 
-async def main():
-    async with Harness(model="provider:model-id", policy=Policy(mode="readonly")) as app:
-        app.use(coding_tools())
-        print(await app.arun("Inspect the project structure and explain its entry points"))
-
-asyncio.run(main())
+app = Harness(model="provider:model-id", policy=Policy(mode="readonly"))
+app.use(coding_tools())
+print(app.run("Read the project structure and explain its entry points"))
 ```
 
-Replace `provider:model-id` with your selected model and configure its credential. Mount custom tools, services and events with `Plugin`; see [examples and the runtime guide](docs/lean-harness.md).
+Replace `provider:model-id` with your model and configure its credential. Use `load_config()` to reuse CLI connection settings. Inside an async application, use `async with app` and `await app.arun(...)`.
 
-## Size and scope
+Compose your own capabilities with `Plugin`:
 
-This branch is a **0.3.0a1 / alpha candidate**: a 591-line core and 2,122 lines across the package, including a replaceable Loop and opt-in reactive plugins. The original version is preserved on a separate branch; the new package focuses on native APIs. Read the [migration guide](docs/legacy-migration.md) before upgrading. See [project status](docs/project-status.md) for counting rules, a DSH comparison, evidence and next steps.
+| Plugin API | Purpose |
+| --- | --- |
+| `ctx.tool(...)` | Mount tools with shared argument validation, authorization and Skill restrictions |
+| `ctx.service(...)` | Provide services for other plugins |
+| `ctx.on(...)` | Subscribe to model and tool events for progress displays or logging |
+| `ctx.cleanup(...)` | Register resource cleanup for exit and failures |
 
-Type `/help` for commands; use `--session <path>` to resume. Shell, Python plugins and MCP servers are trusted code; tool authorization is not a container sandbox. See [runtime and migration guidance](docs/lean-harness.md) for permissions, recovery and legacy API boundaries.
+Plugins support dependency ordering, startup rollback and reverse cleanup. See the [guide](docs/lean-harness.md) for custom tools, MCP, Skills and persistent sessions.
 
-## Contribute and credits
+## Read the core
 
-Reproducible issues, small plugins and real task examples are welcome. Read [AGENTS.md](AGENTS.md) for development principles and the [Changelog](docs/CHANGELOG.md) for changes.
+Start with these 4 files:
 
-Coding tools draw on [nanocode](https://github.com/1rgs/nanocode); model adapters use [any-llm](https://github.com/mozilla-ai/any-llm), and MCP uses its official Python SDK. The logo continues the terminal visual style of the author's [AlphaEvo](https://github.com/ZhuLinsen/alphaevo).
+| File | Responsibility |
+| --- | --- |
+| [agent.py](miniagent/agent.py) | The model → tool → model task loop |
+| [harness.py](miniagent/harness.py) | Plugins, services, events and lifecycles |
+| [llm.py](miniagent/llm.py) | Model calls and streamed responses |
+| [registry.py](miniagent/tools/registry.py) | Tool registration, argument validation and authorization |
+
+The four-file core is **591 lines**; the entire Python package is **2,122 lines**, including CLI, tools and configuration. Counts include comments and blank lines and exclude third-party dependencies. Verify with `python scripts/source_stats.py`; see [counting details](docs/project-status.md).
+
+## Docs
+
+[Guide](docs/lean-harness.md) · [Model setup](docs/model-connections.md) · [Changelog](docs/CHANGELOG.md) · [Contributing rules](AGENTS.md)
+
+Currently Alpha. Read the [migration guide](docs/legacy-migration.md) before upgrading from the old API. Shell, plugins and MCP servers are trusted code; tool authorization does not provide a container sandbox.
 
 [Apache License 2.0](LICENSE)
