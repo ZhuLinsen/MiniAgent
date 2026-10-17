@@ -36,6 +36,21 @@ python scripts/capture_terminal.py --output demo-capture -- --workspace demo-wor
 
 4. 在 `demo-workspace` 复跑 `python -m unittest -v`，检查只修复了 `calculator.py`。
 
+## 终端动态回放
+
+首页的 `coding-replay.gif` 根据本分支已有的 `coding-session.txt` 逐段绘制，保留原始提示、工具顺序和回答；统一调整播放间隔，末帧停留 4.5 秒。因此它是实录的动态回放，不是本轮重新调用模型或录制桌面，也不用于展示实际响应速度。原始文本、静态 PNG 和运行元数据仍可查看。
+
+复现渲染时，在独立工具环境安装 Pillow，并指定本机等宽字体；Pillow 不加入 MiniAgent 的运行依赖：
+
+```bash
+python -m pip install Pillow
+python scripts/render_terminal_replay.py docs/assets/coding-session.txt demo-replay.gif --font path/to/monospace.ttf
+```
+
+Windows 可以将字体参数写成 `--font consola.ttf`。脚本只读取文本，不调用模型，不修改任务结果。要重新执行真实任务，使用上面的 `capture_terminal.py` 命令录制自己的输出，再传给渲染脚本。
+
+The GIF replays the existing real CLI transcript with edited timing. It is not a new model run, a desktop screen recording, or a latency measurement. Rendering uses optional Pillow tooling; the agent runtime is unchanged.
+
 ## Windows 案例
 
 README 中的浏览器与 Word GIF 是项目原版的 Windows 实录，文件分别为 `resource/miniagent_chrome.gif`、`resource/miniagent_word.gif`；本轮恢复展示，未重新录制或修改图像。录屏对应旧版工具入口，不能当作原生 0.3 的 GUI 回归结果。
