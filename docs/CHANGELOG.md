@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [文档] 双语首页改为突出少量核心源码、开箱即用的编程 Agent 与可嵌入 Harness；精简模型验收和依赖介绍，增加四文件源码阅读入口。
+
 - [新功能] Agent Loop 成为默认插件服务，可通过 loop_plugin 替换；Harness 继续管理互斥、会话锁和不确定副作用守卫。
 - [新功能] Harness(reactive=True) 支持 PENDING 依赖等待、requires 插件依赖和 inject 服务依赖、传递失活与重新激活；默认静态模式保持严格行为。
 - [修复] 插件初始化与清理同时失败时保留两类异常；关闭的 Scope 和任务运行中的资源注册被拒绝。
