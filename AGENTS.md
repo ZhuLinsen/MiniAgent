@@ -8,7 +8,7 @@
 
 ## 项目定位与能力目标
 
-MiniAgent 是以插件为核心的轻量 Python Agent Harness。目标是用容易读懂的小内核覆盖 DSH 常用 Agent 场景：模型调用、工具循环、Context/Service、插件生命周期与清理、事件、Skills、MCP 和可恢复会话。
+MiniAgent 是 Python 原生的迷你 Harness + 编程 Agent，以插件组合能力，提供可嵌入的运行时和开箱可用的 CLI。目标是用容易读懂的小内核覆盖 DSH 常用 Agent 场景：模型调用、工具循环、Context/Service、插件生命周期与清理、事件、Skills、MCP 和可恢复会话。
 
 能力必须有可运行示例、测试或真实任务证据。未逐项验证时，不宣称“已实现 DSH 大部分功能”、完整兼容或稳定发布。完整 Fiber 树、HMR、市场、Web 管理台等按实际需求单独评估，避免为对标数量扩大内核。
 

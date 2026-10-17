@@ -7,7 +7,9 @@ from uuid import uuid4
 
 from rich.console import Console
 from rich.markdown import Markdown
+from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.table import Table
 from rich.text import Text
 
 from .config import load_config
@@ -94,7 +96,7 @@ async def cli_run(args, *, console=None, backend=None):
         def end(event):
             elapsed = time.monotonic() - starts.pop(event["call_id"], time.monotonic())
             symbol = "failed" if event["error"] else "done"
-            console.print(Text(f"  {symbol} {event['name']} · {elapsed:.2f}s"))
+            console.print(Text(f"  {symbol} {event['name']} · {elapsed:.2f}s", style="red" if event["error"] else "green"))
         ctx.on("tool.start", start)
         ctx.on("tool.end", end)
         ctx.on("llm.request", lambda event: chunks.clear())
@@ -110,6 +112,8 @@ async def cli_run(args, *, console=None, backend=None):
         chunks.append(token)
         console.print(Text(token), end="", highlight=False)
     async def ask(query):
+        if console.is_terminal and args.prompt is not None:
+            console.print(Panel(Text(query), title="You", border_style="bright_black"))
         answer = await app.arun(query, stream=stream if streaming else None)
         if not chunks:
             console.print(Markdown(answer) if console.is_terminal else Text(answer))
@@ -136,7 +140,16 @@ async def cli_run(args, *, console=None, backend=None):
         app.apply_skill(app.skill)
     try:
         async with app:
-            console.print(Text(f"MiniAgent · {model} · {app.policy.workspace}\nSession: {app.session.path}", style="dim"))
+            if console.is_terminal:
+                welcome = Text("MiniAgent", style="bold green")
+                welcome.append("  /  Python harness + agent\n", style="dim")
+                welcome.append(f"{model}  ·  {args.policy}\n", style="cyan")
+                welcome.append(f"Workspace: {app.policy.workspace.name}  ·  Session: {app.session.path.stem[:8]}", style="dim")
+                if args.prompt is None:
+                    welcome.append("\n/help commands  ·  /connect models  ·  /q exit", style="dim")
+                console.print(Panel(welcome, border_style="green", padding=(1, 2)))
+            else:
+                console.print(Text(f"MiniAgent · {model} · {app.policy.workspace}\nSession: {app.session.path}", style="dim"))
             if args.prompt is not None:
                 await ask(args.prompt)
                 return 0
@@ -150,7 +163,17 @@ async def cli_run(args, *, console=None, backend=None):
                     if text in {"/q", "/quit", "/exit"}:
                         break
                     if text == "/help":
-                        console.print(Text("/connect · /models · /model [provider:model] · /plugins · /skills [name|path|off]\n/session [new|resolve ID verified-result] · /stream · /help · /q"))
+                        commands = Table(box=None, padding=(0, 2), show_header=False)
+                        for command, purpose in (
+                            ("/connect", "Connect a provider"), ("/models", "Choose a model"),
+                            ("/model [provider:model]", "Show or switch model; starts a new session"),
+                            ("/plugins", "List active plugins"), ("/skills [name|path|off]", "List or switch Skills"),
+                            ("/session [new]", "Inspect or start a session"),
+                            ("/session resolve ID verified-result", "Record a verified result before resuming"),
+                            ("/stream", "Toggle streaming"), ("/q", "Exit"),
+                        ):
+                            commands.add_row(Text(command, style="cyan"), Text(purpose))
+                        console.print(commands)
                     elif text == "/plugins":
                         console.print(Text(", ".join(app.active)))
                     elif text.startswith("/skills"):

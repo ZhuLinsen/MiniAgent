@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="300" viewBox="0 0 960 300" role="img" aria-labelledby="title desc">
+  <title id="title">MiniAgent — Python native harness + agent</title>
+  <desc id="desc">An amber and coral terminal mark and MiniAgent wordmark on a dark terminal card. Original editable artwork, inspired by the author's AlphaEvo identity.</desc>
+  <defs>
+    <linearGradient id="warm" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#ffae42"/><stop offset=".52" stop-color="#ff815c"/><stop offset="1" stop-color="#ff607e"/></linearGradient>
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse"><path d="M0 1H4" stroke="#fff" stroke-opacity=".018"/></pattern>
+    <g id="symbol" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="0" y="0" width="104" height="104" rx="25" stroke-width="5"/><path d="m30 33 19 19-19 19m31 0h20" stroke-width="8"/></g>
+  </defs>
+  <rect width="960" height="300" rx="20" fill="#111015"/><rect width="960" height="300" rx="20" fill="url(#scan)"/>
+  <g opacity=".65"><circle cx="34" cy="28" r="5" fill="#ff607e"/><circle cx="52" cy="28" r="5" fill="#ff9d36"/><circle cx="70" cy="28" r="5" fill="#ffd095"/></g>
+  <g stroke="url(#warm)"><use href="#symbol" x="80" y="88" opacity=".08"/><use href="#symbol" x="87" y="88" opacity=".16"/><use href="#symbol" x="94" y="88" opacity=".28"/><use href="#symbol" x="101" y="88"/></g>
+  <g font-family="Consolas, 'Liberation Mono', monospace" font-weight="700" font-size="100" letter-spacing="-3">
+    <text x="233" y="163" fill="none" stroke="#ffae42" stroke-opacity=".1" stroke-width="1">MiniAgent</text>
+    <text x="240" y="163" fill="none" stroke="#ff815c" stroke-opacity=".2" stroke-width="1">MiniAgent</text>
+    <text x="247" y="163" fill="url(#warm)">MiniAgent</text>
+  </g>
+  <path d="M101 214H861" stroke="#ff815c" stroke-opacity=".55"/>
+  <text x="247" y="246" font-family="Consolas, 'Liberation Mono', monospace" font-size="15" letter-spacing="2.3" fill="#dcac84">PYTHON NATIVE · HARNESS + AGENT</text>
+  <rect x="811" y="232" width="10" height="17" fill="#ffae42"/>
+</svg>
