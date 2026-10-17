@@ -34,6 +34,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
+    "any-llm-sdk==1.33.0",
     "jsonschema>=4.20,<5",
     "distro>=1.8.0",
     "openai>=1.0.0",
@@ -74,3 +75,4 @@ include = ["miniagent*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["live: opt-in real provider tests requiring explicit credentials"]

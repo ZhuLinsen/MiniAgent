@@ -45,13 +45,19 @@ class Scope:
 
 
 class Harness:
-    def __init__(self, backend=None, *, policy=None, system_prompt="You are a helpful assistant."):
+    def __init__(self, backend=None, *, model=None, providers=None, api_key=None,
+                 base_url=None, temperature=None, policy=None,
+                 system_prompt="You are a helpful assistant."):
         self.services, self.events, self.plugins, self.active = {}, {}, {}, {}
         self.registry = Registry()
         self.policy = policy or Policy()
         self.system_prompt, self.backend = system_prompt, backend
         self.messages = []
         self.busy = False
+        if model:
+            from .llm import llm_plugin
+            self.use(llm_plugin(model, providers=providers, api_key=api_key,
+                                base_url=base_url, temperature=temperature))
 
     def _idle(self):
         if self.busy:
