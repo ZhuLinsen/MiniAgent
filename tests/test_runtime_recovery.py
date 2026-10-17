@@ -2,11 +2,10 @@
 import asyncio
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from miniagent import Harness, MiniAgent, Plugin
+from miniagent import Harness, Plugin
 from miniagent.plugins import coding_tools, shell
 from miniagent.policy import Policy
 from miniagent.session import Session
@@ -117,17 +116,20 @@ def test_nonzero_shell_exit_emits_failed_status(tmp_path):
     asyncio.run(scenario())
 
 
-def test_legacy_added_tools_respect_and_survive_skill_switch():
-    with patch.object(MiniAgent, "_init_llm_client"):
-        agent = MiniAgent("test", "fake")
-    agent.add_tool({"name": "read", "description": "read", "executor": lambda: None})
-    agent.load_skill("reviewer")
-    agent.add_tool({"name": "write", "description": "write", "executor": lambda: None})
-    assert [t["name"] for t in agent.tools] == ["read"]
-    agent.load_skill("coder")
-    assert [t["name"] for t in agent.tools] == ["read", "write"]
-    agent.load_skill("reviewer")
-    assert [t["name"] for t in agent.tools] == ["read"]
+def test_added_tools_respect_and_survive_skill_switch():
+    from miniagent.skills import get_skill
+    async def scenario():
+        app = Harness()
+        app.use(Plugin("tools", lambda ctx: ctx.tool(Tool("read", "read", {"type": "object"}, lambda: None))))
+        async with app:
+            app.apply_skill(get_skill("reviewer"))
+            app.active["tools"].tool(Tool("write", "write", {"type": "object"}, lambda: None))
+            assert [t["function"]["name"] for t in app.registry.schemas()] == ["read"]
+            app.apply_skill(get_skill("coder"))
+            assert [t["function"]["name"] for t in app.registry.schemas()] == ["read", "write"]
+            app.apply_skill(get_skill("reviewer"))
+            assert [t["function"]["name"] for t in app.registry.schemas()] == ["read"]
+    asyncio.run(scenario())
 
 
 def test_sensitive_files_are_hidden_from_managed_read_search_and_glob(tmp_path):

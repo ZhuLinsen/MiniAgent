@@ -19,6 +19,9 @@ from miniagent.plugins import coding_tools
 from miniagent.policy import Policy
 
 assert all(importlib.util.find_spec(name) is None for name in ("psutil", "requests", "mcp", "keyring"))
+assert all(importlib.util.find_spec("miniagent." + name) is None for name in (
+    "legacy", "legacy_cli", "memory", "orchestrator", "tools.basic_tools", "utils.json_utils"))
+
 class Backend:
     async def complete(self, messages, tools, stream):
         return {"role": "assistant", "content": "installed wheel works"}
@@ -77,7 +80,7 @@ def main():
         if args.report:
             args.report.parent.mkdir(parents=True, exist_ok=True)
             args.report.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print("Minimal installed-wheel smoke passed (no MCP or legacy extras).")
+    print("Minimal installed-wheel smoke passed (no optional extras).")
 
 
 if __name__ == "__main__":

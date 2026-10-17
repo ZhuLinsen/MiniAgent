@@ -1,4 +1,4 @@
-"""CLI entry point. Native Harness is default; legacy text teaching mode is opt-in."""
+"""CLI entry point for the native Harness."""
 import argparse
 import asyncio
 import sys
@@ -8,11 +8,9 @@ from . import __version__
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if "--legacy" in argv:
-        from .legacy_cli import main as legacy_main
-        argv.remove("--legacy")
-        return legacy_main(argv)
     parser = argparse.ArgumentParser(prog="miniagent")
+    if "--legacy" in argv:
+        parser.error("Text mode was retired in 0.3. Use the native CLI or the codex/legacy-pre-harness branch; see docs/legacy-migration.md.")
     parser.add_argument("--version", "-V", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--config", help="Configuration JSON")
     parser.add_argument("--connect", action="store_true", help="Configure a model interactively and exit")

@@ -8,6 +8,11 @@
 
 - [文档] 双语首页改为突出少量核心源码、开箱即用的编程 Agent 与可嵌入 Harness；精简模型验收和依赖介绍，增加四文件源码阅读入口。
 
+- [改进] 0.3.0a1 候选集中原生 Harness API，移除旧 MiniAgent/文本 CLI、全局工具目录、系统工具、Reflection、Memory 和旧 Orchestrator；PR #7 之前的旧版保留于 codex/legacy-pre-harness，数据文件不删除。
+- [修复] Shell 统一使用原生异步执行与清理；负超时在 Schema 阶段拒绝，JSON 退役/未支持字段明确报错，LLM_TEMPERATURE 按配置说明生效。
+- [文档] 同步双语首页、原生运行指南、旧版分支与公开 API 迁移表，更新配置模板和可导入的原生示例；About 文案留待维护者确认。
+- [测试] 原生回归与 MCP 子进程清理继续保留，补充退役入口、无旧模块安装包、配置迁移及示例导入检查；psutil 仅作为开发测试依赖。
+
 - [新功能] Agent Loop 成为默认插件服务，可通过 loop_plugin 替换；Harness 继续管理互斥、会话锁和不确定副作用守卫。
 - [新功能] Harness(reactive=True) 支持 PENDING 依赖等待、requires 插件依赖和 inject 服务依赖、传递失活与重新激活；默认静态模式保持严格行为。
 - [修复] 插件初始化与清理同时失败时保留两类异常；关闭的 Scope 和任务运行中的资源注册被拒绝。

@@ -1,22 +1,149 @@
 {
   "captured_on": "2026-10-17",
   "python": "3.12.10",
-  "platform": "Windows",
-  "base_revision": "64c1fcbcb0b3168168d969a74b6c85e5ec4fa429",
-  "runtime_file": "miniagent/cli_runtime.py",
-  "runtime_sha256": "e932d82ba79fc7bed5f9f9db7bc32b5acbd4fe763030bead0d8a916e532b0a67",
+  "platform": "win32",
+  "miniagent_version": "0.3.0a1",
+  "runtime_revision": "3bb2f20b444a441337b19cf13724e5c233c388d7",
+  "runtime_sha256": {
+    "miniagent/__init__.py": "945df643174b2bc99556ee21c319c89738a9d9e9cb4d870b89f176d30c1fd3ef",
+    "miniagent/__main__.py": "b2557ccf866c981fd65bc19b07e7280cc6963a4ee9558bbc1a08fa3cbe5e6158",
+    "miniagent/agent.py": "79f7a1b79b333ad6428b784fe651274e4ca361471df316b35b4fa3d6b279284b",
+    "miniagent/cli.py": "1415bda917df6bcfa653fcc2c7f3d4467766cdcc07a8c4ea0384ed90f9af4748",
+    "miniagent/cli_runtime.py": "e932d82ba79fc7bed5f9f9db7bc32b5acbd4fe763030bead0d8a916e532b0a67",
+    "miniagent/config.py": "81c036f4a33e9d3522112c2e3910bbb913f6d845e17a761a9b6125b49d27c8b3",
+    "miniagent/connections.py": "49995e9d120a92c524e86ff7969c14801af7623233eb36292d60fbeb154e15c7",
+    "miniagent/extensions/__init__.py": "d903464a4112b2a6f01a7b9a3f21158c1d15e68193bcce1b013bdb3e7e9d8142",
+    "miniagent/extensions/mcp_plugin.py": "457472a6f9c7720773ee7cf7498fb0251a852a778baf5ef94bd16135509ce2f6",
+    "miniagent/harness.py": "d4455d5d9eb1e53c53824f4458ed8fe459b030e63ec40ab7c22b40a1c0a2c0e9",
+    "miniagent/llm.py": "6e6a06f54e8ecf8a51f0ae0fad608f491e711bc638f7c64ef195908536b6469c",
+    "miniagent/logger.py": "2ae05ea19b900e59a5627b61d50a3c13d51d00c51fa6f226f0b5fadaa112b720",
+    "miniagent/plugins.py": "55fedfadfdecc621724406c4d88cbb273daa19a9bfbcb316b15f2531c880d2c8",
+    "miniagent/policy.py": "1b42688100aa6f23ea713c4855f74d49ed6ffd496e3e4c149e76b8352da8a066",
+    "miniagent/session.py": "f7b12b787498bfaac745f136e5c13ad7e866e92ebc6d4d8fe68f157416e6577f",
+    "miniagent/skills.py": "b625aa3dc6c8017b6792a027c3c653b8d417ad124edda3a746bf40fa478ccdd5",
+    "miniagent/tools/__init__.py": "49628aad3fe6cb54b3e93f72c4bdea3e6a11abf6ce48dd92ea776e5e7338b169",
+    "miniagent/tools/code_tools.py": "91cdc25df0016f1048b09d926b084d68f5a3690c5a9c2affe5285235c5c4f28e",
+    "miniagent/tools/registry.py": "0c326d03a6bd20ce4b59c0451ae360d43f00a2c50a484c9ff2098eb5dcc264d5",
+    "miniagent/utils/__init__.py": "c809ff5ce2de0506598ac9e659df4c128c80d66c4bcff1c7a097b6b4729fcfdf",
+    "miniagent/utils/text_utils.py": "969e19d47e1f215a1d3ace68f9afe2f12f927e982a44abaef6b1b7949b33ae00"
+  },
   "model": "anspire:qwen3.5-flash",
-  "request_count": 4,
-  "total_tokens": 5068,
+  "request_count": 5,
+  "repair_request_count": 4,
+  "resume_request_count": 1,
+  "total_tokens": 7167,
+  "usage": [
+    {
+      "completion_tokens": 131,
+      "prompt_tokens": 947,
+      "total_tokens": 1078,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 75,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 131
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": null,
+        "cache_write_tokens": null,
+        "cache_creation_token_details": null,
+        "text_tokens": 947
+      }
+    },
+    {
+      "completion_tokens": 112,
+      "prompt_tokens": 1283,
+      "total_tokens": 1395,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 51,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 112
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": null,
+        "cache_write_tokens": null,
+        "cache_creation_token_details": null,
+        "text_tokens": 1283
+      }
+    },
+    {
+      "completion_tokens": 54,
+      "prompt_tokens": 1410,
+      "total_tokens": 1464,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 19,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 54
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": null,
+        "cache_write_tokens": null,
+        "cache_creation_token_details": null,
+        "text_tokens": 1410
+      }
+    },
+    {
+      "completion_tokens": 73,
+      "prompt_tokens": 1535,
+      "total_tokens": 1608,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 43,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 73
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": null,
+        "cache_write_tokens": null,
+        "cache_creation_token_details": null,
+        "text_tokens": 1535
+      }
+    },
+    {
+      "completion_tokens": 192,
+      "prompt_tokens": 1430,
+      "total_tokens": 1622,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 150,
+        "rejected_prediction_tokens": null,
+        "text_tokens": 192
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": null,
+        "cache_write_tokens": null,
+        "cache_creation_token_details": null,
+        "text_tokens": 1430
+      }
+    }
+  ],
   "tool_sequence": [
+    "read",
     "read",
     "edit",
     "bash"
   ],
+  "initial_test_failed": true,
   "independent_test_passed": true,
   "test_file_unchanged": true,
   "test_file_sha256": "ecac6ee2c37366de5b12b4b9b487d89292643259514f22696f884cf0e7d93260",
   "source_after": "def add(a, b):\n    return a + b\n",
-  "recording": "Real CLI Rich Console output rendered as SVG and PNG; no backend substitution",
-  "scope": "Small isolated repair fixture; not a benchmark or native vendor acceptance"
+  "resume_verified": true,
+  "user_turns": 2,
+  "tool_results_paired": true,
+  "resume_answer": "I fixed the `add()` function in calculator.py by changing `return a - b` to `return a + b`. The test suite passed successfully with all tests showing \"ok\".",
+  "recording": "Real CLI Rich Console output rendered as SVG and PNG; output sink only; real model and tools",
+  "scope": "Small isolated repair plus session resume; not a benchmark or native vendor acceptance"
 }

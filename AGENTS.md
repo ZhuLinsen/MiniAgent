@@ -48,7 +48,7 @@ MiniAgent 是 Python 原生的迷你 Harness + 编程 Agent，以插件组合能
 
 - miniagent/agent.py、harness.py、llm.py、tools/registry.py：四文件核心；以统计脚本清单为准。
 - policy.py、plugins.py、session.py：外围运行机制；连接配置在 connections.py，CLI 在 cli.py / cli_runtime.py。
-- extensions/：可选集成；legacy.py / legacy_cli.py 及旧工具是兼容路径，删除需独立迁移评审。
+- extensions/：可选 MCP 集成。0.3 仅维护原生 API；旧教学/文本/系统工具保存在 codex/legacy-pre-harness，不恢复平行旧实现。迁移边界见 docs/legacy-migration.md。
 - tests/：确定性回归与显式 opt-in live 测试；scripts/：验证与构建；docs/：专题说明；.claude/reviews/：本地审查产物。
 - 以可执行代码、脚本和工作流为准，发现相关文档漂移要顺手修正。AGENTS.md 不复制完整架构或过期实现。
 

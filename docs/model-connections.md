@@ -11,7 +11,7 @@ miniagent
 `--connect` saves setup and exits without starting a task. A normal first launch
 opens the guide only when a model/credential is missing, stdin is a TTY and no
 `--prompt` was supplied. Noninteractive automation never prompts for credentials
-and returns 2 for missing configuration. `--legacy` retains explicit setup.
+and returns 2 for missing configuration. Text mode is retired; see [migration](legacy-migration.md).
 EOF or Ctrl+C cancels initial setup. Keep provider API keys out of CLI arguments.
 
 ## Provider and model selection
