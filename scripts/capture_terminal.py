@@ -20,7 +20,8 @@ if __name__ == "__main__":
     parser.add_argument("--width", type=int, default=100)
     parser.add_argument("args", nargs=argparse.REMAINDER)
     options = parser.parse_args()
-    console = Console(record=True, force_terminal=True, color_system="truecolor", width=options.width)
+    # Explicit dimensions also honor width when the caller exports TERM=dumb.
+    console = Console(record=True, force_terminal=True, color_system="truecolor", width=options.width, height=40)
     argv = options.args[1:] if options.args[:1] == ["--"] else options.args
     # Only the output sink changes. Backend, tools, policy and session are real.
     with patch("miniagent.cli_runtime.Console", return_value=console):

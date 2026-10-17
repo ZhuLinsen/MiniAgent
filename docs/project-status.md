@@ -44,6 +44,7 @@ DSH 本身已有 Python SDK，其 Python 客户端启动打包的 DSH 运行时�
 | 代码搜索、文件编辑、命令执行 | 已有 | `test_code_tools.py`、`test_tool_registry.py`、`test_runtime_recovery.py` |
 | 工具 Schema、授权与工作区检查 | 已有 | Policy 和 Skill 的执行入口统一；Shell/MCP/插件仍为可信代码，未提供容器沙箱 |
 | 持久会话、压缩、取消与异常恢复 | 已有 | `test_session.py`、`test_runtime_recovery.py`；未知副作用不自动重放，需核实后 resolve |
+| Usage / Cost | 部分 | 模型返回的用量通过事件和 CLI 展示；尚无统一费用计价或跨会话费用账本，不把 tokens 当成已核实金额 |
 | Skills / MCP | 已有受限实现 | Skill 标量 frontmatter + 工具白名单；MCP 仅 stdio；本地真实服务测试在 `test_mcp_skills.py` |
 | 首次连接、模型选择、终端反馈 | 已有，本 PR 改善展示 | `test_connections.py`、`test_cli_runtime.py`；平台凭据库的真实覆盖仍不完整 |
 | 子 Agent、后台任务、Web/Desktop、HMR、插件市场 | 未实现相应产品能力 | 旧 Orchestrator 不等于原生 Harness 的子 Agent；这些不纳入当前轻量 CLI 的完成声明 |
