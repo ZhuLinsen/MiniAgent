@@ -142,8 +142,9 @@ def compact(messages, budget, reserve=1024):
 
 async def context_view(app, backend):
     schema_size = len(json.dumps(app.registry.schemas()).encode("utf-8"))
-    view = compact(app.messages, app.context_budget - schema_size)
-    if view is app.messages:
+    source = [dict(m, content=app.system_prompt) if m["role"] == "system" else m for m in app.messages]
+    view = compact(source, app.context_budget - schema_size)
+    if view is source:
         return view
     marker = view[sum(m["role"] == "system" for m in view)]
     retained = len(view) - sum(m["role"] == "system" for m in view) - 1

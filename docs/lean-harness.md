@@ -72,3 +72,28 @@ used as a conservative token estimate, not an exact provider tokenizer.
 Compaction retains whole recent turns, summarizes old data with no tools, and
 falls back to an explicit omission notice. An oversized current turn errors
 instead of splitting a tool group. Long-term Memory remains legacy-only.
+
+## Skills and MCP migration
+
+`app.apply_skill(get_skill("reviewer"))` limits schema visibility AND execution.
+Switching skills or `app.apply_skill()` restores the tool catalog.
+`read_skill(path)` supports scalar name/description and allowed-tools
+(space-separated names or a JSON list) plus Markdown body. This is a limited
+frontmatter format, not full YAML or automatic discovery.
+
+Install `miniagent[mcp]` (validated MCP SDK 2.3.0), then:
+
+```python
+from miniagent.extensions.mcp_plugin import mcp_plugin
+app.use(mcp_plugin("local", command, args, cwd=workspace))
+```
+
+Use an explicit executable and argument list, not a shell command string.
+Tools are namespaced as local__tool. All calls require policy approval even
+if the server declares read-only annotations. The connection has a dedicated
+owner task to close its context in the same task that entered it.
+Discovery failure rolls back tools/services; unload closes the process.
+Remote names are closure-bound: a payload field such as `_name` is forwarded as
+data and cannot change the approved tool route or bypass the Skill whitelist.
+Old MCPClient and load_mcp_tools APIs fail with an actionable migration message.
+Streamable HTTP is deferred.
