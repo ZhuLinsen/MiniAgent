@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [文档] 恢复首页 Windows 浏览器与 Word 自动化演示，全部案例直接展开；重写中文介绍并同步英文，补充原版录屏来源与当前 Shell/Python 使用说明。
+
 - [文档] 双语首页改为突出少量核心源码、开箱即用的编程 Agent 与可嵌入 Harness；精简模型验收和依赖介绍，增加四文件源码阅读入口。
 
 - [改进] 0.3.0a1 候选集中原生 Harness API，移除旧 MiniAgent/文本 CLI、全局工具目录、系统工具、Reflection、Memory 和旧 Orchestrator；PR #7 之前的旧版保留于 codex/legacy-pre-harness，数据文件不删除。

@@ -43,6 +43,39 @@ python scripts/capture_terminal.py --output demo-capture -- --workspace demo-wor
 miniagent --session <session-jsonl-path> --workspace demo-workspace --no-stream --prompt "Without calling any tools, briefly recall which function you fixed and the test result from our previous turn."
 ```
 
+## Windows 案例
+
+README 中的浏览器与 Word GIF 是项目原版的 Windows 实录，文件分别为 `resource/miniagent_chrome.gif`、`resource/miniagent_word.gif`；本轮恢复展示，未重新录制或修改图像。录屏对应旧版工具入口，不能当作原生 0.3 的 GUI 回归结果。
+
+原生 CLI 保留 `bash` 工具，在 Windows 上使用本机 Shell 执行命令。它可以调用 Python 脚本、本机程序或安装的自动化工具；默认工具集不包含 `open_browser`、`open_app`、`create_docx` 等旧工具。旧版仍可使用 [归档分支](legacy-migration.md)。
+
+### 打开浏览器
+
+运行 `miniagent`，输入：
+
+> 使用 Python 标准库 webbrowser 打开默认浏览器，在 Google 搜索 MiniAgent 的 GitHub 仓库。
+
+打开网页可使用 Python [webbrowser 标准库](https://docs.python.org/3/library/webbrowser.html)调用系统默认浏览器；继续点击网页、读取页面或操作表单，需要配置浏览器自动化脚本或相应 MCP 服务。当前工具集没有内置视觉识别或鼠标定位。
+
+### 生成 Word 文档
+
+生成 `.docx` 文件可在 MiniAgent 使用的 Python 环境安装相应库，例如 [python-docx](https://python-docx.readthedocs.io/en/latest/user/install.html)：
+
+```bash
+python -m pip install python-docx
+miniagent
+```
+
+然后输入：
+
+> 使用 Python 生成一篇 500 字的 AI Agent 介绍，保存为 agent-intro.docx，包含标题、小节和正文。完成后检查文件是否生成。
+
+生成文档文件不要求安装 Microsoft Word；在 Word 窗口内点击、输入和排版则需要已安装的 Word、可交互的 Windows 桌面及相应自动化依赖。桌面点击和键盘操作可以通过自己配置的脚本或 MCP 服务接入，不是安装 MiniAgent 后自带的 GUI 工具。
+
+这些任务需要执行 Shell 或写入文件，不能在 `--policy readonly` 下运行。使用默认交互模式，先查看命令再确认；非交互模式不会替你确认。原生版尚未重跑上述浏览器和 Office 的完整桌面流程。
+
+The two Windows GIFs in the README are original-version recordings. The native CLI uses local Shell/Python or configured MCP tools; document generation and GUI interaction require their own dependencies. These recordings do not claim a fresh native-version GUI validation.
+
 ## 设计资产
 
 维护者选择了 A 方向：延续作者 AlphaEvo 的暖色终端风格。可编辑资产为 [横幅](assets/miniagent-banner.svg) 与 [独立图标](assets/miniagent-icon.svg)，没有外部字体下载或动画。横幅用于 README，图标可用作头像。
