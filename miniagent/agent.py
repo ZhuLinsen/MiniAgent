@@ -852,7 +852,8 @@ async def agent_loop(app, query, *, max_steps=10, stream=None):
     """Native loop shared by the Harness; messages never contain SDK objects."""
     if max_steps < 1:
         raise ValueError("max_steps must be positive")
-    if app.backend is None:
+    backend = app.backend or app.services.get("llm")
+    if backend is None:
         raise ValueError("An LLM backend is required")
     if not app.messages:
         app.messages.append({"role": "system", "content": app.system_prompt})
@@ -860,8 +861,8 @@ async def agent_loop(app, query, *, max_steps=10, stream=None):
     for step in range(max_steps):
         await app.emit("agent.step", step=step)
         await app.emit("llm.request", step=step)
-        message = await app.backend.complete(app.messages, app.registry.schemas(), stream)
-        await app.emit("llm.response", usage=getattr(app.backend, "usage", {}))
+        message = await backend.complete(app.messages, app.registry.schemas(), stream)
+        await app.emit("llm.response", usage=getattr(backend, "usage", {}))
         app.messages.append(message)
         calls = message.get("tool_calls") or []
         if not calls:

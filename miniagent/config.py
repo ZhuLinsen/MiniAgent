@@ -41,6 +41,7 @@ class AgentConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     system_prompt: str = "You are a helpful AI assistant."
     default_tools: List[str] = field(default_factory=list)
+    providers: Dict[str, Any] = field(default_factory=dict)
     enable_reflection: bool = False
     reflection_system_prompt: Optional[str] = None
     reflection_max_iterations: int = 3
@@ -65,35 +66,37 @@ def load_config(config_path: Optional[str] = None) -> AgentConfig:
     # Default configuration
     config = AgentConfig()
     
-    # Try to get API key from environment variables with multiple fallbacks
-    # Priority order: LLM_API_KEY > OPENAI_API_KEY > DEEPSEEK_API_KEY > GEMINI_API_KEY
-    # > GOOGLE_API_KEY > ANTHROPIC_API_KEY > AZURE_OPENAI_API_KEY
-    env_api_key = (
-        os.environ.get("LLM_API_KEY") or 
-        os.environ.get("OPENAI_API_KEY") or 
-        os.environ.get("DEEPSEEK_API_KEY") or 
-        os.environ.get("GEMINI_API_KEY") or
-        os.environ.get("GOOGLE_API_KEY") or
-        os.environ.get("ANTHROPIC_API_KEY") or 
-        os.environ.get("AZURE_OPENAI_API_KEY")
-    )
-    
-    if env_api_key:
-        config.llm.api_key = env_api_key
-        
-    # Try to get API base URL from environment variables with multiple fallbacks
-    # Priority order: LLM_API_BASE > OPENAI_API_BASE > DEEPSEEK_API_BASE > ANTHROPIC_API_BASE > AZURE_OPENAI_ENDPOINT
-    env_api_base = (
-        os.environ.get("LLM_API_BASE") or 
-        os.environ.get("OPENAI_API_BASE") or 
-        os.environ.get("DEEPSEEK_API_BASE") or 
-        os.environ.get("ANTHROPIC_API_BASE") or 
-        os.environ.get("AZURE_OPENAI_ENDPOINT")
-    )
-    
-    if env_api_base:
-        config.llm.api_base = env_api_base
-        
+    # Explicit compatibility credentials belong to the selected endpoint.
+    config.llm.api_key = os.environ.get("LLM_API_KEY")
+    config.llm.api_base = os.environ.get("LLM_API_BASE")
+    model = os.environ.get("LLM_MODEL", "")
+    aliases = {
+        "openai": ("OPENAI_API_KEY", "OPENAI_API_BASE"),
+        "deepseek": ("DEEPSEEK_API_KEY", "DEEPSEEK_API_BASE"),
+        "gemini": ("GEMINI_API_KEY", "GEMINI_API_BASE"),
+        "anthropic": ("ANTHROPIC_API_KEY", "ANTHROPIC_API_BASE"),
+        "azure": ("AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"),
+    }
+    provider = model.partition(":")[0] if ":" in model else None
+    if provider is None and config.llm.api_base:
+        base = config.llm.api_base.lower()
+        provider = next((p for p in aliases if p in base), None)
+        if "generativelanguage.googleapis.com" in base:
+            provider = "gemini"
+    if provider is None and not config.llm.api_base:
+        configured = [p for p, (key, base) in aliases.items()
+                      if os.environ.get(key) or os.environ.get(base)]
+        if len(configured) == 1 and not model:
+            provider = configured[0]
+        else:
+            provider = "openai"
+    if provider in aliases:
+        key, base = aliases[provider]
+        config.llm.api_key = config.llm.api_key or os.environ.get(key)
+        config.llm.api_base = config.llm.api_base or os.environ.get(base)
+        if provider == "gemini":
+            config.llm.api_key = config.llm.api_key or os.environ.get("GOOGLE_API_KEY")
+
     # Try to get organization from environment variables
     env_organization = os.environ.get("LLM_ORGANIZATION") or os.environ.get("OPENAI_ORGANIZATION")
     if env_organization:
