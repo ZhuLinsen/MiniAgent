@@ -13,7 +13,7 @@
 
 <p align="center"><a href="README.md">中文</a> · <a href="#quick-start">Quick start</a> · <a href="#demos">Demos</a> · <a href="#use-it-as-a-python-harness">Python API</a> · <a href="#read-the-source">Source</a></p>
 
-MiniAgent reads code, edits files, runs tests and calls local programs for browser and document tasks. Use it in your terminal, or embed its **Harness** in your own Python project. The core is **531 lines across 4 files**. [Read the source](#read-the-source).
+MiniAgent reads code, edits files, runs tests and calls local programs for browser and document tasks. Use it in your terminal, or embed its **Harness** in your own Python project. The core is **598 lines across 4 files**. [Read the source](#read-the-source).
 
 ## Demos
 
@@ -88,12 +88,12 @@ These 4 files cover the main execution path:
 
 | File | Lines | Responsibility |
 | --- | ---: | --- |
-| [agent.py](miniagent/agent.py) | 72 | Call the model → execute tools → return results |
-| [harness.py](miniagent/harness.py) | 256 | Plugins, services, events and lifecycles |
+| [agent.py](miniagent/agent.py) | 81 | Call the model → execute tools → return results |
+| [harness.py](miniagent/harness.py) | 314 | Plugins, services, events and lifecycles |
 | [llm.py](miniagent/llm.py) | 149 | Model interface and streamed responses |
 | [registry.py](miniagent/tools/registry.py) | 54 | Tool registration, validation and authorization |
 
-The core totals **531 lines**. CLI, tools, configuration and legacy compatibility code are counted separately. Counts include comments and blank lines and exclude third-party dependencies. Run `python scripts/source_stats.py` to verify. [Detailed counts](docs/project-status.md)
+The core totals **598 lines**. CLI, tools, configuration and legacy compatibility code are counted separately. Counts include comments and blank lines and exclude third-party dependencies. Run `python scripts/source_stats.py` to verify. [Detailed counts](docs/project-status.md)
 
 ## Docs and contributing
 

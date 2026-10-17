@@ -51,8 +51,10 @@ def test_mcp_real_stdio_denial_call_cleanup():
         pid = result["structuredContent"]["pid"]
         # Enter and exit from separate tasks: SDK context remains in its owner task.
         await asyncio.create_task(app.unuse("mcp:local"))
-        assert not app.registry.tools and not app.services
+        assert not app.registry.tools and set(app.services) == {"agent_loop"}
         assert not psutil.pid_exists(pid)
+        await app.aclose()
+        assert not app.services
     asyncio.run(scenario())
 
 

@@ -1,6 +1,6 @@
 # 2026-10-11 acceptance evidence
 
-Scope: v0.2.0a1, Windows, Python 3.12.10. These are measured results, not
+Scope: commit `fccd011`, v0.2.0a1, Windows, Python 3.12.10. These are measured results, not
 a stable v0.3 or full original-plan acceptance claim.
 
 ## Real API and coding task

@@ -13,7 +13,7 @@
 
 <p align="center"><a href="README_EN.md">English</a> · <a href="#快速开始">快速开始</a> · <a href="#演示">演示</a> · <a href="#作为-python-harness-使用">Python API</a> · <a href="#读源码">源码</a></p>
 
-MiniAgent 可以读代码、改文件、运行测试，也可以调用本机程序处理浏览器、文档等任务。在终端里直接使用，或作为 **Harness** 嵌入自己的 Python 项目。核心 **531 行、4 个文件**，[从这里读源码](#读源码)。
+MiniAgent 可以读代码、改文件、运行测试，也可以调用本机程序处理浏览器、文档等任务。在终端里直接使用，或作为 **Harness** 嵌入自己的 Python 项目。核心 **598 行、4 个文件**，[从这里读源码](#读源码)。
 
 ## 演示
 
@@ -88,12 +88,12 @@ Harness 负责模型与工具之间的循环、插件启动和清理，以及会
 
 | 文件 | 行数 | 做什么 |
 | --- | ---: | --- |
-| [agent.py](miniagent/agent.py) | 72 | 调用模型 → 执行工具 → 返回结果 |
-| [harness.py](miniagent/harness.py) | 256 | 插件、服务、事件和生命周期 |
+| [agent.py](miniagent/agent.py) | 81 | 调用模型 → 执行工具 → 返回结果 |
+| [harness.py](miniagent/harness.py) | 314 | 插件、服务、事件和生命周期 |
 | [llm.py](miniagent/llm.py) | 149 | 模型接口与流式响应 |
 | [registry.py](miniagent/tools/registry.py) | 54 | 工具注册、参数校验与权限检查 |
 
-核心合计 **531 行**；CLI、工具、配置和旧版兼容代码另计。 行数包含注释和空行，不含第三方依赖。运行 `python scripts/source_stats.py` 可复核。[详细统计](docs/project-status.md)
+核心合计 **598 行**；CLI、工具、配置和旧版兼容代码另计。 行数包含注释和空行，不含第三方依赖。运行 `python scripts/source_stats.py` 可复核。[详细统计](docs/project-status.md)
 
 ## 文档与贡献
 
