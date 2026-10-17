@@ -1,90 +1,88 @@
-# MiniAgent
+<p align="center">
+  <img src="docs/assets/miniagent-banner.svg" width="800" alt="MiniAgent — a Python-native mini harness + agent">
+</p>
 
-**Tiny Core. Real Agent Capabilities.** A plugin-first Python Agent Harness that combines models, tools, Skills, MCP and resumable sessions.
+<p align="center"><strong>Small core. Real work.</strong><br>A Python-native mini harness + coding agent. Read it, change it, run it in your terminal.</p>
 
-[中文](README.md) · [Runtime and migration guide](docs/lean-harness.md) · [Changelog](docs/CHANGELOG.md) · [CI](https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml)
+<p align="center">
+  <a href="https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml"><img src="https://github.com/ZhuLinsen/MiniAgent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB" alt="Python 3.11+">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache 2.0"></a>
+  <img src="https://img.shields.io/badge/status-alpha-ff815c" alt="Alpha">
+</p>
 
-Requires **Python 3.11+**. Version **0.2.0a1** is for evaluating the architecture and developing plugins. Two models passed live Anspire gateway acceptance; native multi-provider acceptance and the total-source reduction target remain incomplete. See the [acceptance evidence](docs/acceptance-2026-10-11.md).
+<p align="center"><a href="README.md">中文</a> · <a href="#quick-start">Quick start</a> · <a href="docs/lean-harness.md">Guide</a> · <a href="docs/project-status.md">Capabilities & source size</a></p>
 
-## Get started
+MiniAgent combines models, a tool loop, plugins, Skills, MCP and resumable sessions in a small Python agent. Use it to inspect code, edit files and run tests, or embed the Harness in your application and add capabilities through plugins.
+
+Inspired by [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): keep the runtime small and compose capabilities through plugins. Built for Python developers who want to understand, customize and share their agents.
+
+## Watch it finish a task
+
+![Actual MiniAgent run: read code, fix an addition function, run tests](docs/assets/coding-session.png)
+
+2026-10-17, Windows / Python 3.12, Anspire `qwen3.5-flash`: a real API, file tools and Shell test run. The test file was unchanged. This image renders the actual recorded CLI output. It demonstrates a small repair task; see [the transcript and reproduction steps](docs/demo.md).
+
+## Quick start
+
+Requires **Python 3.11+**. Install from the current source:
 
 ```bash
 git clone https://github.com/ZhuLinsen/MiniAgent.git
 cd MiniAgent
-python -m pip install .
-```
-
-Create `.env` in the project and fill in your provider key and model ID. Replace `<model-id>` below. For Qwen use `dashscope:<model-id>` and `DASHSCOPE_API_KEY`; for Claude use `anthropic:<model-id>` and `ANTHROPIC_API_KEY`.
-
-Alternatively run `miniagent --connect`. An interactive first launch with a missing model or credential opens the guide. In the REPL, `/connect` configures a provider and `/models` selects a model. See [connections and credentials](docs/model-connections.md).
-
-Select a model explicitly. Noninteractive calls with only a key or API URL fail before client creation. Precedence is `--model`, JSON `llm.model`, `LLM_MODEL`, then the saved connection default.
-
-```dotenv
-DEEPSEEK_API_KEY=your-provider-key
-LLM_MODEL=deepseek:<model-id>
-```
-
-```bash
-miniagent --policy readonly --prompt "Inspect the project structure and explain its entry points"
+python -m pip install ".[credentials]"
 miniagent
 ```
 
-Writes, Shell and MCP calls require confirmation by default. Noninteractive confirmation denies execution. Use `--policy trusted` for automation you explicitly trust. Managed file tools hide `.env*` (except `.env.example`), `.git` and private-key files unless `--allow-sensitive-files` is explicitly supplied. Shell, Python plugins and MCP servers are trusted code outside the managed file boundary.
+On your first interactive launch, choose a provider, enter its key and select a model ID. Keys can use a supported OS credential vault; without one, they remain in memory for the current process. Use `/connect` to add connections and `/models` to switch models. See [connection setup](docs/model-connections.md).
 
-## Capabilities
+Writes and Shell calls require confirmation by default. Start with a read-only inspection:
 
-- Native tool calls and streamed text; one async model boundary with provider credential isolation.
-- Instance-owned tool registry; dependency ordering, activation rollback and reverse cleanup, with a replaceable Agent Loop and opt-in reactive dependency lifecycle.
-- `read / write / edit / grep / glob / bash` with workspace checks and authorization.
-- JSONL sessions, context compaction that preserves whole tool groups, and inspection before resuming uncertain effects.
-- Reversible Skill execution whitelists and optional official MCP SDK stdio integration.
+```bash
+miniagent --policy readonly --prompt "Inspect the project structure and explain its entry points"
+```
 
-CLI commands: `/help`, `/connect`, `/models`, `/model`, `/plugins`, `/skills`, `/session`, `/stream`. `/plugins` currently lists loaded plugins. `--session <path>` resumes a session; `/session new` creates one. Switching models creates a fresh session.
+For automation, explicitly configure a model through environment variables, JSON or CLI arguments. Install MCP with `python -m pip install ".[mcp]"`. Run `miniagent --help` for options.
 
-## Python API
+## The everyday agent toolkit
+
+| Capability | In MiniAgent |
+| --- | --- |
+| Models & tool loop | Multiple providers, native tool calls and streamed text |
+| Coding tools | `read`, `write`, `edit`, `grep`, `glob`, `bash` |
+| Plugin composition | Context/Service, dependencies, events, rollback, cleanup, a replaceable Loop and opt-in reactive lifecycle |
+| Skills & MCP | Switch prompts and tool allowlists; connect MCP stdio servers |
+| Resumable sessions | JSONL history, context compaction, inspection before resuming uncertain effects |
+| Terminal interface | Connection guide, tool progress, Markdown answers and session commands |
+
+## Use it from Python
 
 ```python
+import asyncio
 from miniagent import Harness
 from miniagent.plugins import coding_tools
 from miniagent.policy import Policy
-from miniagent.session import Session
 
-app = Harness(model="deepseek:<model-id>", policy=Policy(mode="readonly"),
-              session=Session("task.jsonl"))
-app.use(coding_tools())
-print(app.run("Inspect the project structure"))
+async def main():
+    async with Harness(model="provider:model-id", policy=Policy(mode="readonly")) as app:
+        app.use(coding_tools())
+        print(await app.arun("Inspect the project structure and explain its entry points"))
+
+asyncio.run(main())
 ```
 
-In an existing event loop use `await app.arun(...)` and `async with app` for resource ownership. One task per Harness; plugins and Skills change only while idle.
+Replace `provider:model-id` with your selected model and configure its credential. Mount custom tools, services and events with `Plugin`; see [examples and the runtime guide](docs/lean-harness.md).
 
-## A custom plugin
+## Size and scope
 
-```python
-from miniagent import Harness, Plugin
-from miniagent.policy import Policy
-from miniagent.tools.registry import Tool
+Current version: **0.2.0a1 / alpha**. This branch has a 598-line core and 5,148 lines across the package, including a replaceable Loop and opt-in reactive plugins. Teaching APIs and compatibility tools still contribute substantially, and the total-source reduction target remains open. See [project status](docs/project-status.md) for counting rules, a DSH comparison, evidence and next steps.
 
-def calculator(ctx):
-    ctx.tool(Tool("add_one", "Add one", {"type": "object",
-                  "properties": {"n": {"type": "integer"}}, "required": ["n"]},
-                  lambda n: n + 1))
+Type `/help` for commands; use `--session <path>` to resume. Shell, Python plugins and MCP servers are trusted code; tool authorization is not a container sandbox. See [runtime and migration guidance](docs/lean-harness.md) for permissions, recovery and legacy API boundaries.
 
-app = Harness(model="deepseek:<model-id>", policy=Policy(mode="trusted"))
-app.use(Plugin("calculator", calculator))
-print(app.run("Use add_one to add 1 to 2"))
-```
+## Contribute and credits
 
-This example explicitly trusts the custom tool. The [runtime guide](docs/lean-harness.md) covers model configuration, MCP installation and plugins, Skill switching, recovery and compatibility.
+Reproducible issues, small plugins and real task examples are welcome. Read [AGENTS.md](AGENTS.md) for development principles and the [Changelog](docs/CHANGELOG.md) for changes.
 
-## Validation and version boundaries
+Coding tools draw on [nanocode](https://github.com/1rgs/nanocode); model adapters use [any-llm](https://github.com/mozilla-ai/any-llm), and MCP uses its official Python SDK. The logo continues the terminal visual style of the author's [AlphaEvo](https://github.com/ZhuLinsen/alphaevo).
 
-CI covers Windows/Linux, Python 3.11/3.12, offline regression, native-runtime static checks, dependency audit, builds and installed-wheel verification without MCP/Legacy extras. Local HTTP fixtures exercise OpenAI, DeepSeek, DashScope/Qwen and Anthropic SDK multi-turn tool protocols. They do not establish live API compatibility.
-
-`python scripts/source_stats.py` reports the four-file core, runtime mechanisms including Policy/tool plugin/Session, and **all official Python source** separately. Teaching and extension compatibility code remains; the 2000–2800 total-line target is not achieved. No live model task screenshot or performance comparison is claimed; simulated output is not presented as a real demo.
-
-Use `miniagent --legacy` for the teaching CLI and install `miniagent[legacy]` for basic/system tools. The old implicit MCP API was removed; migrate to `mcp_plugin` as documented. Automatic dependency recovery, long-term Memory and Streamable HTTP are outside this alpha delivery.
-
-## Acknowledgments and license
-
-Coding tools are inspired by [nanocode](https://github.com/1rgs/nanocode). Licensed under [Apache License 2.0](LICENSE).
+[Apache License 2.0](LICENSE)
