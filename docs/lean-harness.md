@@ -47,8 +47,11 @@ side effect or global decorator catalog.
 
 Dependencies are static: `requires` names plugins, missing or cyclic dependencies
 fail at startup, and an active dependency cannot be unloaded before its consumers.
-Harness calls the native agent loop directly. Reactive dependencies and a public
-replaceable Loop interface are separate proposals, not requirements of this version.
+The default remains strict startup. `Harness(reactive=True)` lets consumers wait
+for declared plugins (`requires`) or services (`inject`) and reactivate at explicit
+lifecycle boundaries. The default native Loop is provided by `agent-loop`;
+`loop_plugin` can replace it while Harness retains session and run guards.
+See [lifecycle, examples and trusted Loop responsibilities](plugin-lifecycle.md).
 
 ## Models and configuration
 

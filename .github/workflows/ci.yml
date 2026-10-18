@@ -24,7 +24,7 @@ jobs:
       - run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra credentials python -m pytest tests -q -m "not live"
       - run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra credentials python -m compileall -q miniagent
       - name: Native runtime static checks
-        run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra credentials ruff check --select F miniagent tests/test_runtime_recovery.py tests/test_provider_protocols.py tests/test_cli_runtime.py tests/test_model_selection.py tests/test_connections.py tests/conftest.py scripts/source_stats.py scripts/minimal_install_smoke.py
+        run: uv run --locked --python ${{ matrix.python }} --extra mcp --extra credentials ruff check --select F miniagent tests/test_runtime_recovery.py tests/test_reactive_plugins.py tests/test_provider_protocols.py tests/test_cli_runtime.py tests/test_model_selection.py tests/test_connections.py tests/conftest.py scripts/source_stats.py scripts/minimal_install_smoke.py
       - name: Export locked production dependencies
         run: uv export --locked --no-dev --extra mcp --extra credentials --no-emit-project --output-file audit-requirements.txt
       - name: Audit production dependencies

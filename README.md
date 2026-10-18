@@ -13,13 +13,13 @@
 
 <p align="center"><a href="README_EN.md">English</a> · <a href="#核心特性">核心特性</a> · <a href="#快速开始">快速开始</a> · <a href="#作为-python-调用">Python API</a> · <a href="#演示">演示</a> · <a href="#项目结构">项目结构</a></p>
 
-MiniAgent 是一个**超轻量、常用功能齐备的 Python Agent / Harness**，核心仅 **524 行代码**。支持工具调用、会话记忆、上下文管理与插件扩展等主流 Agent 常用能力，**可以直接使用，也适合快速入门学习、定制修改和二次开发。**
+MiniAgent 是一个**超轻量、常用功能齐备的 Python Agent / Harness**，核心仅 **591 行代码**。支持工具调用、会话记忆、上下文管理与插件扩展等主流 Agent 常用能力，**可以直接使用，也适合快速入门学习、定制修改和二次开发。**
 
 ## 核心特性
 
 - 🧠 **功能齐备**：原生工具调用、流式输出、会话记忆、上下文压缩、Skills、MCP、插件管理与权限控制，组成可运行的 Agent / Harness。
 - 🚀 **直接使用**：连接模型后即可通过 CLI 执行编程与自动化任务，也能通过 Python API 嵌入现有项目。
-- 📖 **快速入门**：核心仅 **524 行、4 个文件**，从模型调用、工具执行到插件管理，适合通过阅读和运行源码理解 Agent / Harness 的工作原理。
+- 📖 **快速入门**：核心仅 **591 行、4 个文件**，从模型调用、工具执行到插件管理，适合通过阅读和运行源码理解 Agent / Harness 的工作原理。
 - 🧩 **定制开发**：修改提示词与 Skills，通过 Plugin 接入自己的工具和服务；复用已有的会话与权限机制，开发自己的 Agent。
 
 ## 快速开始
@@ -88,8 +88,8 @@ Harness 负责模型与工具之间的循环、插件启动和清理，以及会
 
 ```text
 miniagent/
-├── agent.py          # Agent 循环 · 65 行
-├── harness.py        # 插件、服务与生命周期 · 256 行
+├── agent.py          # Agent 循环 · 74 行
+├── harness.py        # 插件、服务与生命周期 · 314 行
 ├── llm.py            # 模型调用与流式输出 · 149 行
 ├── tools/
 │   ├── registry.py   # 工具注册与执行检查 · 54 行
@@ -102,7 +102,7 @@ miniagent/
 └── cli.py           # 命令行入口
 ```
 
-四文件核心 **524 行**；全部官方包 Python **2,067 行**。行数包含注释和空行，不含第三方依赖。运行 `python scripts/source_stats.py` 可复核。[统计脚本](scripts/source_stats.py)
+四文件核心 **591 行**；全部官方包 Python **2,135 行**。行数包含注释和空行，不含第三方依赖。运行 `python scripts/source_stats.py` 可复核。[统计脚本](scripts/source_stats.py)
 
 ## 文档与贡献
 

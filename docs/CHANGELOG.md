@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [修复] 插件 Scope 在任务执行中和关闭后拒绝注册服务、工具、事件与清理回调；初始化和清理同时失败时保留两项异常，失败激活回滚新增资源。
+- [新增] 显式启用 `Harness(reactive=True)` 可等待插件和服务依赖，依赖卸载时传递清理，恢复后在生命周期边界重新激活；`loop_plugin` 支持替换可信 Agent Loop，默认仍使用原生循环。
 - [修复] 自定义算术工具及指南示例接收 Policy 注入的 path，补充实际 Registry 执行与清理检查；温度按 CLI、JSON、环境的最终生效值校验，空环境回退默认值，不再阻止高优先级配置覆盖。
 - [改进] 0.3.0a1 候选集中原生 Harness / Session / Plugin / MCP，退役旧文本 Agent、系统工具、Memory 和 Orchestrator；旧实现保留在 codex/legacy-pre-harness，迁移说明列出不兼容入口。
 - [改进] 文件工具元数据不再注册到全局目录，Shell 复用单一异步实现；移除旧版运行依赖和无效配置字段，未知 JSON 设置明确报错。

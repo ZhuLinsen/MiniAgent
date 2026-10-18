@@ -5,6 +5,15 @@ import os
 from .utils.text_utils import smart_truncate
 
 
+def loop_plugin(loop=None, *, name="agent-loop", requires=(), inject=()):
+    """Register a trusted async loop while Harness retains run/session guards."""
+    from .harness import Plugin
+    loop = agent_loop if loop is None else loop
+    if not callable(loop):
+        raise ValueError("Agent loop must be callable")
+    return Plugin(name, lambda ctx: ctx.service("agent_loop", loop), requires, inject)
+
+
 async def agent_loop(app, query, *, max_steps=10, stream=None):
     """Native loop shared by the Harness; messages never contain SDK objects."""
     if max_steps < 1:

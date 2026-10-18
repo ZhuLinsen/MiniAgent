@@ -18,7 +18,7 @@ git clone --branch codex/legacy-pre-harness --single-branch https://github.com/Z
 | --- | --- | --- |
 | `MiniAgent`、`run(mode="text")`、`--legacy` | `Harness`、`app.run()` / `await app.arun()`、默认 CLI | 只使用原生工具调用，不再解析 TOOL/ARGS 文本；旧入口明确提示迁移 |
 | `Memory` / `memory.json` | 显式 `Session(path)` / CLI JSONL 会话 | 保留旧文件，不自动转换；长期事实记忆暂不新增 |
-| `Orchestrator` | 旧编排继续使用旧分支；原生版可用 Python 调用 Harness 并组合 Plugin | 没有内置编排器等价替代，本轮不新增子 Agent 或可替换 Loop 接口 |
+| `Orchestrator` | 旧编排继续使用旧分支；原生版可用 Python 调用 Harness 并组合 Plugin | 没有内置编排器或子 Agent 等价替代；可替换 Loop 的职责与边界见[生命周期指南](plugin-lifecycle.md) |
 | `register_tool`、全局工具目录、`load_tools` | `ctx.tool(Tool(...))`、`coding_tools()` | 工具归属各 Harness；导入文件工具不会写入全局注册表 |
 | 同步 `code_tools.bash()` | `miniagent.plugins.shell()` 或 `coding_tools()` 中的 bash | 统一异步进程、超时、取消和输出上限；直接调用 shell 时超时抛异常 |
 | `MCPClient` / `load_mcp_tools` | `mcp_plugin`、`miniagent[mcp]` | 官方 SDK stdio 生命周期与统一授权 |
@@ -62,6 +62,6 @@ JSON agent 顶层接受：`llm`、`providers`、`mcp_servers`、`system_prompt`�
 
 ## 测试与代码量
 
-本 PR 已同步 main `929cfe2`（含 #15 的 CLI 展示），不依赖 #13 的响应式插件和可替换 Loop。相对该基线：四文件核心 **531 → 524**，运行机制 **833 → 827**，全部包 **5079 → 2067**。删除的是已退役实现，没有把它们挪到统计边界之外。
+原生精简由 #16 独立完成，不依赖 #13 的响应式插件和可替换 Loop。相对当时 main `929cfe2`（含 #15 的 CLI 展示）：四文件核心 **531 → 524**，运行机制 **833 → 827**，全部包 **5079 → 2067**。这是 #16 的历史统计，当前统计见双语 README 与 `scripts/source_stats.py`。删除的是已退役实现，没有把它们挪到统计边界之外。
 
 旧文本协议、系统工具、Memory、Orchestrator 和旧入口的专用测试随能力退役。主线的原生 Harness、模型协议、授权、会话恢复、真实本地 MCP 和连接套件保留；Skill/工具案例迁移至原生 API，文本截断边界测试继续保留，并增加退役入口、包内容、配置拒绝和示例导入回归。测试数减少不作为质量提升的证据。
