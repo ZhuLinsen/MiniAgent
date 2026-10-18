@@ -10,7 +10,7 @@
 git clone --branch codex/legacy-pre-harness --single-branch https://github.com/ZhuLinsen/MiniAgent.git MiniAgent-legacy
 ```
 
-在独立虚拟环境中按旧分支说明安装。旧分支是历史快照；原有模型与供应商服务是否仍可用，需要按该分支环境验证。0.2 过渡实现和完整测试仍可在本 PR 基线 `9f17af6` 的 Git 历史查看。
+在独立虚拟环境中按旧分支说明安装。旧分支是历史快照；原有模型与供应商服务是否仍可用，需要按该分支环境验证。0.2 过渡实现和完整测试仍可在本 PR 基线 `929cfe2` 的 Git 历史查看。
 
 ## 公开入口迁移
 
@@ -46,7 +46,7 @@ print(app.run("Inspect the project and explain its entry points"))
 JSON agent 顶层接受：`llm`、`providers`、`mcp_servers`、`system_prompt`、`context_budget`。`llm` 接受：`model`、`api_key`、`api_base`、`temperature`。未支持的字段明确报错，不继续悄悄忽略。
 
 - 给模型补全 `provider:model-id`；未带前缀的 ID 统一归 OpenAI，不根据 URL 猜供应商。
-- `LLM_TEMPERATURE` 现在实际生效，JSON `llm.temperature` 可覆盖。CLI 覆盖优先级保持不变。
+- 温度按 `--temperature` > JSON `llm.temperature` > `LLM_TEMPERATURE` > 0.7 选择后，再校验生效值。空环境视为未设置；无效的低优先级值不会阻止覆盖。JSON `null` 保留供应商默认值，其他生效值必须是有限数值。
 - 旧 `default_tools`、`output_format`、`enable_reflection`、反思参数及未实际接线的 `llm.max_tokens` / `timeout` / `max_retries` 等需从 JSON 删除。
 - `BASH_TIMEOUT`、`BASH_MAX_OUTPUT`、`TOOL_RESULT_LIMIT` 仍通过环境生效；不再在 AgentConfig 中保留无效镜像字段。
 - `MAX_CONTEXT_MESSAGES` 改用 `context_budget` / `MINIAGENT_CONTEXT_BUDGET`。授权改用 `--policy`；所有 Shell/MCP 调用经过策略，不只匹配危险命令正则。

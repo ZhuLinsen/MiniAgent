@@ -1,4 +1,4 @@
-"""Native examples can be imported without parsing args or making API calls."""
+"""Native examples import safely and documented tools execute through Policy."""
 import asyncio
 from pathlib import Path
 import runpy
