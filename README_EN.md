@@ -102,7 +102,7 @@ miniagent/
 └── cli.py           # CLI entry point
 ```
 
-The core totals **524 lines**; all first-party package Python totals **2,031 lines**. Counts include comments and blank lines and exclude third-party dependencies. Run `python scripts/source_stats.py` to verify. [Counting script](scripts/source_stats.py)
+The core totals **524 lines**; all first-party package Python totals **2,067 lines**. Counts include comments and blank lines and exclude third-party dependencies. Run `python scripts/source_stats.py` to verify. [Counting script](scripts/source_stats.py)
 
 ## Docs and contributing
 
