@@ -88,8 +88,8 @@ Harness 负责模型与工具之间的循环、插件启动和清理，以及会
 
 ```text
 miniagent/
-├── agent.py          # Agent 循环 · 65 行
-├── harness.py        # 插件、服务与生命周期 · 256 行
+├── agent.py          # Agent 循环 · 74 行
+├── harness.py        # 插件、服务与生命周期 · 314 行
 ├── llm.py            # 模型调用与流式输出 · 149 行
 ├── tools/
 │   ├── registry.py   # 工具注册与执行检查 · 54 行

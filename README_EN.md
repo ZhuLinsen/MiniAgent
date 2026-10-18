@@ -88,8 +88,8 @@ The core lives in [agent.py](miniagent/agent.py), [harness.py](miniagent/harness
 
 ```text
 miniagent/
-├── agent.py          # Agent loop · 65 lines
-├── harness.py        # Plugins, services and lifecycle · 256 lines
+├── agent.py          # Agent loop · 74 lines
+├── harness.py        # Plugins, services and lifecycle · 314 lines
 ├── llm.py            # Model calls and streaming · 149 lines
 ├── tools/
 │   ├── registry.py   # Tool registration and execution checks · 54 lines
