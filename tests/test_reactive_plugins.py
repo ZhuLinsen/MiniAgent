@@ -241,21 +241,55 @@ def test_loop_service_waits_for_injected_dependency():
     asyncio.run(scenario())
 
 
-def test_active_scope_cannot_register_resources_during_task_or_after_close():
+@pytest.mark.parametrize("resource", ["service", "tool", "listener", "cleanup"])
+def test_active_scope_cannot_register_resources_during_task_or_after_close(resource):
     async def scenario():
         scopes = []
         app = Harness()
         app.use(Plugin("owner", lambda ctx: scopes.append(ctx)))
         await app.start()
+        def register():
+            scope = scopes[0]
+            if resource == "service":
+                scope.service("late", 1)
+            elif resource == "tool":
+                scope.tool(tool("late"))
+            elif resource == "listener":
+                scope.on("late", lambda event: None)
+            else:
+                scope.cleanup(lambda: None)
         async def custom(runtime, query, **kwargs):
             with pytest.raises(RuntimeError, match="running"):
-                scopes[0].service("late", 1)
+                register()
             return "ok"
         await app.unuse("agent-loop")
         app.use(loop_plugin(custom))
         assert await app.arun("go") == "ok"
         await app.unuse("owner")
         with pytest.raises(RuntimeError, match="closed"):
-            scopes[0].service("late", 1)
+            register()
+        await app.aclose()
+        assert not app.services and not app.registry.tools
+        assert not app.events.get("late")
+    asyncio.run(scenario())
+
+
+def test_failed_setup_scope_cannot_register_after_rollback():
+    async def scenario():
+        scopes = []
+        app = Harness()
+        def broken(ctx):
+            scopes.append(ctx)
+            ctx.service("partial", 1)
+            raise RuntimeError("setup failed")
+        app.use(Plugin("broken", broken))
+        with pytest.raises(RuntimeError, match="setup failed"):
+            await app.start()
+        with pytest.raises(RuntimeError, match="closed"):
+            scopes[0].service("late", 2)
+        assert not app.active and not app.services and not app.busy
+        await app.unuse("broken")
+        await app.start()
+        assert app.states["agent-loop"] == "ACTIVE"
         await app.aclose()
     asyncio.run(scenario())

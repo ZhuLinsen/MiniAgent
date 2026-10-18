@@ -29,7 +29,8 @@ def new_session():
 async def cli_run(args, *, console=None, backend=None):
     console = console or Console()
     try:
-        cfg = load_config(args.config, model_override=args.model, base_override=args.base_url)
+        cfg = load_config(args.config, model_override=args.model, base_override=args.base_url,
+                          temperature_override=args.temperature)
     except ValueError as error:
         console.print(Text(f"Configuration error: {error}", style="red"))
         return 2
@@ -47,7 +48,8 @@ async def cli_run(args, *, console=None, backend=None):
             model = await connect(console, cfg)
             if explicit_connect:
                 return 0
-            cfg = load_config(args.config, model_override=model, base_override=args.base_url)
+            cfg = load_config(args.config, model_override=model, base_override=args.base_url,
+                              temperature_override=args.temperature)
         except (EOFError, KeyboardInterrupt):
             return 130
         except Exception as error:
@@ -67,7 +69,7 @@ async def cli_run(args, *, console=None, backend=None):
             return False
     app = Harness(backend, model=None if backend else model, providers=cfg.providers,
                   api_key=args.api_key or cfg.llm.api_key, base_url=args.base_url or cfg.llm.api_base,
-                  temperature=args.temperature if args.temperature is not None else cfg.llm.temperature,
+                  temperature=cfg.llm.temperature,
                   policy=Policy(args.workspace, mode=args.policy, approve=approve,
                                 allow_sensitive_files=getattr(args, "allow_sensitive_files", False)),
                   session=Session(args.session) if args.session else new_session(),
@@ -119,10 +121,11 @@ async def cli_run(args, *, console=None, backend=None):
             console.print(Markdown(answer) if console.is_terminal else Text(answer))
     async def switch_model(next_model):
         nonlocal model, cfg
-        next_cfg = load_config(args.config, model_override=next_model, base_override=args.base_url)
+        next_cfg = load_config(args.config, model_override=next_model, base_override=args.base_url,
+                               temperature_override=args.temperature)
         candidate = LLMBackend(next_model, providers=next_cfg.providers,
                                api_key=args.api_key or next_cfg.llm.api_key, base_url=next_cfg.llm.api_base,
-                               temperature=args.temperature if args.temperature is not None else next_cfg.llm.temperature)
+                               temperature=next_cfg.llm.temperature)
         try:
             if "llm" in app.plugins:
                 await app.unuse("llm")

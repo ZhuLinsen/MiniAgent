@@ -1,19 +1,12 @@
-"""Native agent loop; the legacy teaching API is a compatibility import."""
+"""Native agent loop driven through the Harness-owned tool boundary."""
 import json
 import os
 
 from .utils.text_utils import smart_truncate
 
 
-def __getattr__(name):
-    if name in {"MiniAgent", "_DANGEROUS_RE"}:
-        from . import legacy
-        return getattr(legacy, name)
-    raise AttributeError(name)
-
-
 def loop_plugin(loop=None, *, name="agent-loop", requires=(), inject=()):
-    """Register a replaceable async loop while Harness keeps run/session guards."""
+    """Register a trusted async loop while Harness retains run/session guards."""
     from .harness import Plugin
     loop = agent_loop if loop is None else loop
     if not callable(loop):

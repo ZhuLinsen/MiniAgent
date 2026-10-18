@@ -4,8 +4,9 @@ Configuration module providing LLM API parameter setup and loading functionality
 
 import os
 import json
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, field
+import math
+from typing import Dict, Any, Optional
+from dataclasses import dataclass, field, fields
 from .connections import credential, read_profiles
 
 # Try to import dotenv if installed
@@ -26,13 +27,7 @@ class LLMConfig:
     model: str = ""
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-    organization: Optional[str] = None
-    timeout: Optional[int] = 60
-    temperature: float = 0.7
-    max_tokens: Optional[int] = None
-    top_p: Optional[float] = None
-    frequency_penalty: Optional[float] = None
-    presence_penalty: Optional[float] = None
+    temperature: Optional[float] = 0.7
 
 @dataclass
 class AgentConfig:
@@ -40,22 +35,12 @@ class AgentConfig:
     
     llm: LLMConfig = field(default_factory=LLMConfig)
     system_prompt: str = "You are a helpful AI assistant."
-    default_tools: List[str] = field(default_factory=list)
     providers: Dict[str, Any] = field(default_factory=dict)
     mcp_servers: Dict[str, Any] = field(default_factory=dict)
-    enable_reflection: bool = False
-    reflection_system_prompt: Optional[str] = None
-    reflection_max_iterations: int = 3
-    
-    # Tool execution limits (configurable via env vars)
-    bash_timeout: int = 120          # BASH_TIMEOUT: bash default timeout in seconds
-    bash_max_output: int = 50000     # BASH_MAX_OUTPUT: bash output truncation limit
-    tool_result_limit: int = 16000   # TOOL_RESULT_LIMIT: tool result truncation limit
-    max_context_messages: int = 20   # MAX_CONTEXT_MESSAGES: auto-compress conversation after N messages
     context_budget: int = 32768     # MINIAGENT_CONTEXT_BUDGET: conservative token budget
-    confirm_dangerous: bool = True   # CONFIRM_DANGEROUS: require confirmation for dangerous commands
 
-def load_config(config_path: Optional[str] = None, *, model_override=None, base_override=None) -> AgentConfig:
+def load_config(config_path: Optional[str] = None, *, model_override=None, base_override=None,
+                temperature_override=None) -> AgentConfig:
     """
     Load configuration from file
     
@@ -82,10 +67,7 @@ def load_config(config_path: Optional[str] = None, *, model_override=None, base_
         "azure": ("AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"),
     }
 
-    # Try to get organization from environment variables
-    env_organization = os.environ.get("LLM_ORGANIZATION") or os.environ.get("OPENAI_ORGANIZATION")
-    if env_organization:
-        config.llm.organization = env_organization
+    config.llm.temperature = os.environ.get("LLM_TEMPERATURE") or config.llm.temperature
         
     # Load tool execution limits from environment
     def _safe_int(key: str, default: int) -> int:
@@ -98,21 +80,24 @@ def load_config(config_path: Optional[str] = None, *, model_override=None, base_
             logger.warning(f"Invalid integer for {key}={val!r}, using default {default}")
             return default
 
-    config.bash_timeout = _safe_int("BASH_TIMEOUT", config.bash_timeout)
-    config.bash_max_output = _safe_int("BASH_MAX_OUTPUT", config.bash_max_output)
-    config.tool_result_limit = _safe_int("TOOL_RESULT_LIMIT", config.tool_result_limit)
-    config.max_context_messages = _safe_int("MAX_CONTEXT_MESSAGES", config.max_context_messages)
     config.context_budget = _safe_int("MINIAGENT_CONTEXT_BUDGET", config.context_budget)
-    if os.environ.get("CONFIRM_DANGEROUS") is not None:
-        config.confirm_dangerous = os.environ["CONFIRM_DANGEROUS"].lower() not in ("0", "false", "no")
-    if os.environ.get("ENABLE_REFLECTION") is not None:
-        config.enable_reflection = os.environ["ENABLE_REFLECTION"].lower() not in ("0", "false", "no")
-    if os.environ.get("REFLECTION_MAX_ITERATIONS"):
-        config.reflection_max_iterations = _safe_int("REFLECTION_MAX_ITERATIONS", config.reflection_max_iterations)
         
     if config_path:
         _load_file(config, config_path)
+        if not isinstance(config.providers, dict) or not isinstance(config.mcp_servers, dict):
+            raise ValueError("providers and mcp_servers must be JSON objects")
         config.providers = {**profile["providers"], **config.providers}
+    if temperature_override is not None:
+        config.llm.temperature = temperature_override
+    if config.llm.temperature is not None:
+        try:
+            if isinstance(config.llm.temperature, bool):
+                raise ValueError
+            config.llm.temperature = float(config.llm.temperature)
+            if not math.isfinite(config.llm.temperature):
+                raise ValueError
+        except (TypeError, ValueError):
+            raise ValueError("Effective temperature must be a finite number (LLM_TEMPERATURE, llm.temperature or --temperature)") from None
     if model_override is not None:
         config.llm.model = model_override
     if base_override is not None:
@@ -125,12 +110,6 @@ def load_config(config_path: Optional[str] = None, *, model_override=None, base_
         config.llm.api_key = None
         return config
     provider = config.llm.model.partition(":")[0] if ":" in config.llm.model else "openai"
-    if ":" not in config.llm.model and config.llm.api_base:
-        # Compatibility for explicitly configured legacy endpoints, never key-only inference.
-        base = config.llm.api_base.lower()
-        provider = next((p for p in aliases if p in base), "openai")
-        if "generativelanguage.googleapis.com" in base:
-            provider = "gemini"
     persisted = provider in profile["models"]
     if provider in config.providers:
         env = config.providers[provider].get("api_key_env")
@@ -149,17 +128,19 @@ def _load_file(config, config_path):
         with open(config_path, "r", encoding="utf-8") as f:
             config_data = json.load(f)
             
-        # Load LLM configuration
-        if "llm" in config_data:
-            for key, value in config_data["llm"].items():
-                if hasattr(config.llm, key):
-                    setattr(config.llm, key, value)
-                    
-        # Load agent configuration
-        for key, value in config_data.items():
-            if key != "llm" and hasattr(config, key):
-                setattr(config, key, value)
-                
-        logger.info(f"Configuration loaded from {config_path}")
-    except Exception as e:
+    except (OSError, ValueError) as e:
         raise ValueError(f"Failed to load configuration from {config_path}") from e
+    def apply(target, data):
+        if not isinstance(data, dict):
+            raise ValueError("Configuration sections must be JSON objects")
+        allowed = {entry.name for entry in fields(target)}
+        unknown = set(data) - allowed
+        if unknown:
+            raise ValueError(f"Unsupported settings: {', '.join(sorted(unknown))}; see docs/legacy-migration.md")
+        for key, value in data.items():
+            setattr(target, key, value)
+    if not isinstance(config_data, dict):
+        raise ValueError("Configuration must be a JSON object")
+    apply(config.llm, config_data.pop("llm", {}))
+    apply(config, config_data)
+    logger.info("Configuration loaded from %s", config_path)

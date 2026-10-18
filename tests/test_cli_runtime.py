@@ -39,6 +39,16 @@ def test_stream_does_not_duplicate_final_answer(tmp_path):
     assert output.getvalue().count("literal text") == 1
 
 
+def test_cli_temperature_override_ignores_invalid_lower_priority_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "invalid")
+    config = tmp_path / "config.json"
+    config.write_text('{"llm":{"temperature":"invalid"}}')
+    output = io.StringIO()
+    args = options(tmp_path, config=str(config), temperature=0.25)
+    assert asyncio.run(cli_run(args, console=Console(file=output), backend=Backend())) == 0
+    assert "literal text" in output.getvalue()
+
+
 def test_terminal_welcome_and_help_keep_paths_private(tmp_path, monkeypatch):
     import sys
     monkeypatch.setattr(sys, "stdin", io.StringIO("/help\n/q\n"))
@@ -82,23 +92,6 @@ def test_config_file_does_not_reuse_wrong_provider_key(tmp_path, monkeypatch):
     for key in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_MODEL"):
         monkeypatch.delenv(key, raising=False)
     assert load_config(str(path)).llm.api_key is None
-
-
-def test_legacy_native_uses_core_loop():
-    from types import SimpleNamespace as NS
-    from unittest.mock import Mock, patch
-    from miniagent import MiniAgent
-    with patch.object(MiniAgent, "_init_llm_client"):
-        agent = MiniAgent("test", "fake")
-    call = NS(id="one", function=NS(name="add", arguments='{"n":2}'))
-    first = NS(content=None, tool_calls=[call])
-    last = NS(content="done", tool_calls=[])
-    agent.client = Mock()
-    agent.client.chat.completions.create.side_effect = [NS(choices=[NS(message=first)]), NS(choices=[NS(message=last)])]
-    agent.add_tool({"name": "add", "description": "add", "executor": lambda n: n + 1})
-    assert agent.run("go", mode="native") == "done"
-    messages = agent.client.chat.completions.create.call_args.kwargs["messages"]
-    assert any(m.get("tool_call_id") == "one" and m["content"] == "3" for m in messages)
 
 
 def test_cli_shows_failed_exit_and_bounded_parameters(tmp_path):
