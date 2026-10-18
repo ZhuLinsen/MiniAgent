@@ -7,7 +7,7 @@ from miniagent.config import load_config
 def calculator(ctx):
     ctx.tool(Tool("add_one", "Add one to an integer", {
         "type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]},
-        lambda n: n + 1, access="read"))
+        lambda n, path: n + 1, access="read"))
     ctx.cleanup(lambda: print("Calculator plugin closed"))
 
 

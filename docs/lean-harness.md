@@ -30,11 +30,15 @@ from miniagent import Plugin, Tool
 def arithmetic(ctx):
     ctx.tool(Tool("add_one", "Add one", {"type": "object",
                   "properties": {"n": {"type": "integer"}}, "required": ["n"]},
-                  lambda n: n + 1, access="read"))
+                  lambda n, path: n + 1, access="read"))
     ctx.cleanup(lambda: print("arithmetic closed"))
 
 app.use(Plugin("arithmetic", arithmetic))
 ```
+
+Policy supplies a resolved `path` argument to every `read`/`write` executor.
+This arithmetic tool accepts that argument and ignores it; it can run under
+`readonly` without changing the Policy interface.
 
 `ctx.service(name, value)`, `ctx.get(name)`, `ctx.on(event, callback)` and
 `ctx.cleanup(callback)` share the plugin's Scope. Registrations unwind on unload;
@@ -67,8 +71,11 @@ evidence of model/tool compatibility. See [connections and vault behavior](model
 
 Native JSON accepts llm, providers, mcp_servers, system_prompt and context_budget.
 The llm section accepts model, api_key, api_base and temperature. Unsupported
-settings fail with migration guidance. `LLM_TEMPERATURE` is supported; JSON can
-override it. Shell/output limits stay environment settings in `.env.example`.
+settings fail with migration guidance. Temperature precedence is CLI
+`--temperature` > JSON `llm.temperature` > `LLM_TEMPERATURE` > 0.7. An empty
+environment value is unset; only the effective value is validated as a finite
+number. JSON `null` leaves the provider default unchanged. Shell/output limits
+stay environment settings in `.env.example`.
 
 Python >=3.11; any-llm-sdk 1.33.0. Native adapters retain SDK retry behavior;
 custom compatible endpoints disable retries. Tools and interrupted streams are

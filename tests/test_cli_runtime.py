@@ -39,6 +39,16 @@ def test_stream_does_not_duplicate_final_answer(tmp_path):
     assert output.getvalue().count("literal text") == 1
 
 
+def test_cli_temperature_override_ignores_invalid_lower_priority_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "invalid")
+    config = tmp_path / "config.json"
+    config.write_text('{"llm":{"temperature":"invalid"}}')
+    output = io.StringIO()
+    args = options(tmp_path, config=str(config), temperature=0.25)
+    assert asyncio.run(cli_run(args, console=Console(file=output), backend=Backend())) == 0
+    assert "literal text" in output.getvalue()
+
+
 def test_repl_session_resume_and_commands(tmp_path, monkeypatch):
     import sys
     monkeypatch.setattr(sys, "stdin", io.StringIO("/help\n/plugins\n/skills reviewer\nfirst\n/session\n/q\n"))

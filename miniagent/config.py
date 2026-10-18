@@ -4,6 +4,7 @@ Configuration module providing LLM API parameter setup and loading functionality
 
 import os
 import json
+import math
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field, fields
 from .connections import credential, read_profiles
@@ -26,7 +27,7 @@ class LLMConfig:
     model: str = ""
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-    temperature: float = 0.7
+    temperature: Optional[float] = 0.7
 
 @dataclass
 class AgentConfig:
@@ -38,7 +39,8 @@ class AgentConfig:
     mcp_servers: Dict[str, Any] = field(default_factory=dict)
     context_budget: int = 32768     # MINIAGENT_CONTEXT_BUDGET: conservative token budget
 
-def load_config(config_path: Optional[str] = None, *, model_override=None, base_override=None) -> AgentConfig:
+def load_config(config_path: Optional[str] = None, *, model_override=None, base_override=None,
+                temperature_override=None) -> AgentConfig:
     """
     Load configuration from file
     
@@ -65,10 +67,7 @@ def load_config(config_path: Optional[str] = None, *, model_override=None, base_
         "azure": ("AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"),
     }
 
-    try:
-        config.llm.temperature = float(os.environ.get("LLM_TEMPERATURE", "0.7"))
-    except ValueError:
-        raise ValueError("LLM_TEMPERATURE must be a number") from None
+    config.llm.temperature = os.environ.get("LLM_TEMPERATURE") or config.llm.temperature
         
     # Load tool execution limits from environment
     def _safe_int(key: str, default: int) -> int:
@@ -88,6 +87,17 @@ def load_config(config_path: Optional[str] = None, *, model_override=None, base_
         if not isinstance(config.providers, dict) or not isinstance(config.mcp_servers, dict):
             raise ValueError("providers and mcp_servers must be JSON objects")
         config.providers = {**profile["providers"], **config.providers}
+    if temperature_override is not None:
+        config.llm.temperature = temperature_override
+    if config.llm.temperature is not None:
+        try:
+            if isinstance(config.llm.temperature, bool):
+                raise ValueError
+            config.llm.temperature = float(config.llm.temperature)
+            if not math.isfinite(config.llm.temperature):
+                raise ValueError
+        except (TypeError, ValueError):
+            raise ValueError("Effective temperature must be a finite number (LLM_TEMPERATURE, llm.temperature or --temperature)") from None
     if model_override is not None:
         config.llm.model = model_override
     if base_override is not None:

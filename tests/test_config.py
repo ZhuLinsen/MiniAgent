@@ -93,5 +93,40 @@ def test_temperature_uses_advertised_environment_and_json_override(tmp_path, mon
 
 def test_invalid_temperature_has_actionable_error(monkeypatch):
     monkeypatch.setenv("LLM_TEMPERATURE", "not-a-number")
-    with pytest.raises(ValueError, match="LLM_TEMPERATURE must be a number"):
+    with pytest.raises(ValueError, match="temperature must be a"):
         load_config()
+
+
+@pytest.mark.parametrize("value", ["", "not-a-number"])
+def test_json_temperature_overrides_invalid_environment(value, tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", value)
+    path = tmp_path / "config.json"
+    path.write_text('{"llm":{"temperature":0.5}}')
+    assert load_config(str(path)).llm.temperature == 0.5
+
+
+def test_empty_temperature_environment_uses_default(monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "")
+    assert load_config().llm.temperature == 0.7
+
+
+def test_cli_temperature_overrides_invalid_lower_priority_values(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "not-a-number")
+    path = tmp_path / "config.json"
+    path.write_text('{"llm":{"temperature":"invalid"}}')
+    assert load_config(str(path), temperature_override=0.25).llm.temperature == 0.25
+
+
+@pytest.mark.parametrize("value", ['"invalid"', '{}', 'true', '"nan"', '"inf"'])
+def test_invalid_effective_json_temperature_is_rejected(value, tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text('{"llm":{"temperature":' + value + '}}')
+    with pytest.raises(ValueError, match="temperature must be a"):
+        load_config(str(path))
+
+
+def test_null_json_temperature_keeps_provider_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "not-a-number")
+    path = tmp_path / "config.json"
+    path.write_text('{"llm":{"temperature":null}}')
+    assert load_config(str(path)).llm.temperature is None
