@@ -1,68 +1,24 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-"""
-Skill System Example — Reusable Agent Configurations
-
-Skills bundle a system prompt + tool whitelist + parameters into a reusable config.
-MiniAgent ships 4 built-in skills: coder, researcher, reviewer, tester.
-
-Usage:
-    uv sync  # install MiniAgent first
-    # or: pip install -e .
-    uv run python examples/skill_example.py
-"""
-
-from miniagent import MiniAgent, Skill, register_skill, get_skill, list_skills
+"""Apply a native Skill to the same tool registry. This calls a real provider."""
+import argparse
+from miniagent import Harness, Policy, get_skill, list_skills
+from miniagent.config import load_config
+from miniagent.plugins import coding_tools
 
 
-def show_builtin_skills():
-    """List all available skills."""
-    print("=== Built-in Skills ===")
-    for name in list_skills():
-        skill = get_skill(name)
-        tools = ", ".join(skill.tools) if skill.tools else "all"
-        print(f"  {name}: tools=[{tools}], temperature={skill.temperature}")
-    print()
-
-
-def use_builtin_skill():
-    """Load a built-in skill onto an agent."""
-    agent = MiniAgent(
-        model="deepseek-chat",
-        api_key="your_api_key",
-        base_url="https://api.deepseek.com/v1",
-    )
-    agent.load_all_tools()
-
-    # Load "coder" skill — sets coding-focused prompt and filters tools
-    agent.load_skill("coder")
-    print(f"Loaded skill 'coder'. Agent now has {len(agent.tools)} tools.")
-    print(f"Tools: {[t['name'] for t in agent.tools]}")
-    print()
-
-
-def register_custom_skill():
-    """Register and use a custom skill."""
-    register_skill(Skill(
-        name="devops",
-        prompt="You are a DevOps engineer. Focus on CI/CD, Docker, and infrastructure.",
-        tools=["bash", "read", "write"],
-        temperature=0.3,
-    ))
-
-    agent = MiniAgent(
-        model="deepseek-chat",
-        api_key="your_api_key",
-        base_url="https://api.deepseek.com/v1",
-    )
-    agent.load_all_tools()
-    agent.load_skill("devops")
-    print(f"Loaded custom skill 'devops'. Agent now has {len(agent.tools)} tools.")
-    print(f"Tools: {[t['name'] for t in agent.tools]}")
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("model", help="provider:model-id")
+    parser.add_argument("skill", choices=list_skills())
+    parser.add_argument("prompt")
+    args = parser.parse_args()
+    cfg = load_config(model_override=args.model)
+    app = Harness(model=cfg.llm.model, providers=cfg.providers, api_key=cfg.llm.api_key,
+                  base_url=cfg.llm.api_base, temperature=cfg.llm.temperature,
+                  policy=Policy(mode="readonly"))
+    app.use(coding_tools())
+    app.apply_skill(get_skill(args.skill))
+    print(app.run(args.prompt))
 
 
 if __name__ == "__main__":
-    show_builtin_skills()
-    use_builtin_skill()
-    register_custom_skill()
+    main()

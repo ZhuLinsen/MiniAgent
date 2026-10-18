@@ -1,32 +1,11 @@
-"""Skill system for MiniAgent.
+"""Reusable prompt, tool allowlist and iteration budget for a Harness.
 
-A Skill is a reusable configuration that bundles:
-- A specialized system prompt
-- An optional tool whitelist (subset of loaded tools)
-- Optional LLM parameters (temperature, max_iterations)
-
-Skills let you create purpose-built agent personas without writing new code.
-
-Example usage:
-    from miniagent.skills import register_skill, get_skill
-
-    @register_skill
-    def code_reviewer():
-        return Skill(
-            name="code_reviewer",
-            prompt="You are a senior code reviewer. Focus on bugs, security, and readability.",
-            tools=["read", "grep", "glob"],
-            temperature=0.3,
-        )
-
-    # Use in agent
-    agent.load_skill("code_reviewer")
-    agent.run("Review the changes in src/auth.py")
+Use app.apply_skill(get_skill("reviewer")); register custom Skill instances with
+register_skill(Skill(name="writer", prompt="...")) or read a local SKILL.md.
 """
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 from pathlib import Path
 import json

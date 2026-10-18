@@ -25,7 +25,7 @@ MiniAgent 是以插件为核心的轻量 Python Agent Harness。目标是用容�
 
 ### DSH 常用能力
 
-- 用 Context/Service、依赖声明、插件清理、可替换 Loop 等解决实际 Agent 任务；新增生命周期行为必须说明等待、激活、失活、恢复和异常回滚。
+- 用 Context/Service、依赖声明和插件清理解决实际 Agent 任务；响应式依赖与可替换 Loop 按独立需求评估，不作为原生 API 精简的前置条件。新增生命周期行为必须说明等待、激活、失活、恢复和异常回滚。
 - 默认优先稳定和显式语义；兼容性变化要说明迁移路径。运行中的任务禁止生命周期变更。
 - 工具仍经 Schema、Policy 和 Skill 检查；会话保留原记录，不重放未知副作用。新能力不得破坏这些守卫。
 - 自定义插件/Loop 的责任和可信边界必须写清楚，不把 Mock 或菜单选项当作真实远端兼容验收。
@@ -48,7 +48,7 @@ MiniAgent 是以插件为核心的轻量 Python Agent Harness。目标是用容�
 
 - miniagent/agent.py、harness.py、llm.py、tools/registry.py：四文件核心；以统计脚本清单为准。
 - policy.py、plugins.py、session.py：外围运行机制；连接配置在 connections.py，CLI 在 cli.py / cli_runtime.py。
-- extensions/：可选集成；legacy.py / legacy_cli.py 及旧工具是兼容路径，删除需独立迁移评审。
+- extensions/：可选集成；旧文本 API、系统工具与编排器保存在 codex/legacy-pre-harness 历史分支，原生版不重新引入，迁移见 docs/legacy-migration.md。
 - tests/：确定性回归与显式 opt-in live 测试；scripts/：验证与构建；docs/：专题说明；.claude/reviews/：本地审查产物。
 - 以可执行代码、脚本和工作流为准，发现相关文档漂移要顺手修正。AGENTS.md 不复制完整架构或过期实现。
 

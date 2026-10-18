@@ -1,15 +1,8 @@
-"""Native agent loop; the legacy teaching API is a compatibility import."""
+"""Native agent loop driven through the Harness-owned tool boundary."""
 import json
 import os
 
 from .utils.text_utils import smart_truncate
-
-
-def __getattr__(name):
-    if name in {"MiniAgent", "_DANGEROUS_RE"}:
-        from . import legacy
-        return getattr(legacy, name)
-    raise AttributeError(name)
 
 
 async def agent_loop(app, query, *, max_steps=10, stream=None):

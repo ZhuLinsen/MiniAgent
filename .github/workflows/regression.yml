@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install this stage and available extras
-        run: python -m pip install -e ".[mcp,legacy]" "pytest>=9.0.3,<10"
+        run: python -m pip install -e ".[mcp,credentials,dev]" "pytest>=9.0.3,<10"
       - run: python -m pytest tests -q -m "not live"
       - run: python -m compileall -q miniagent
       - run: python scripts/source_stats.py
