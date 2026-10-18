@@ -1,0 +1,22 @@
+{
+  "captured_on": "2026-10-17",
+  "python": "3.12.10",
+  "platform": "Windows",
+  "base_revision": "64c1fcbcb0b3168168d969a74b6c85e5ec4fa429",
+  "runtime_file": "miniagent/cli_runtime.py",
+  "runtime_sha256": "e932d82ba79fc7bed5f9f9db7bc32b5acbd4fe763030bead0d8a916e532b0a67",
+  "model": "anspire:qwen3.5-flash",
+  "request_count": 4,
+  "total_tokens": 5068,
+  "tool_sequence": [
+    "read",
+    "edit",
+    "bash"
+  ],
+  "independent_test_passed": true,
+  "test_file_unchanged": true,
+  "test_file_sha256": "ecac6ee2c37366de5b12b4b9b487d89292643259514f22696f884cf0e7d93260",
+  "source_after": "def add(a, b):\n    return a + b\n",
+  "recording": "Real CLI Rich Console output rendered as SVG and PNG; no backend substitution",
+  "scope": "Small isolated repair fixture; not a benchmark or native vendor acceptance"
+}
