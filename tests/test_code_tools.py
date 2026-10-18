@@ -1,9 +1,11 @@
 """Tests for code_tools (read/write/edit/grep/glob/bash)."""
 
+import asyncio
 import os
 import sys
 import pytest
-from miniagent.tools.code_tools import read, write, edit, grep, glob, bash
+from miniagent.tools.code_tools import read, write, edit, grep, glob
+from miniagent.plugins import shell
 from miniagent.utils.text_utils import smart_truncate
 
 
@@ -78,25 +80,23 @@ class TestGrep:
 
 class TestBash:
     def test_echo(self, tmp_workspace):
-        result = bash("echo hello")
-        assert result["exit_code"] == 0
-        assert result["stdout"] == "hello"
+        result = asyncio.run(shell("echo hello", cwd=str(tmp_workspace)))
+        assert result["exit_code"] == 0 and result["stdout"].strip() == "hello"
 
     def test_failing_command(self, tmp_workspace):
-        result = bash("false")
-        assert result["exit_code"] != 0
+        cmd = f'"{sys.executable}" -c "raise SystemExit(7)"'
+        assert asyncio.run(shell(cmd, cwd=str(tmp_workspace)))["exit_code"] == 7
 
     def test_timeout(self, tmp_workspace):
-        result = bash(f'"{sys.executable}" -c "import time; time.sleep(10)"', timeout=1)
-        assert result["exit_code"] == 1
-        assert "timed out" in result["stderr"].lower()
+        cmd = f'"{sys.executable}" -c "import time; time.sleep(10)"'
+        with pytest.raises(TimeoutError):
+            asyncio.run(shell(cmd, cwd=str(tmp_workspace), timeout=1))
 
     def test_bash_timeout_from_env(self, tmp_workspace, monkeypatch):
-        """bash() with timeout=0 should read BASH_TIMEOUT env var."""
         monkeypatch.setenv("BASH_TIMEOUT", "1")
-        result = bash(f'"{sys.executable}" -c "import time; time.sleep(10)"', timeout=0)
-        assert result["exit_code"] == 1
-        assert "timed out" in result["stderr"].lower()
+        cmd = f'"{sys.executable}" -c "import time; time.sleep(10)"'
+        with pytest.raises(TimeoutError):
+            asyncio.run(shell(cmd, cwd=str(tmp_workspace)))
 
 
 class TestSmartTruncate:
@@ -115,3 +115,18 @@ class TestSmartTruncate:
         text = "x" * 10000
         result = smart_truncate(text, 200)
         assert "10000 total" in result
+
+
+    def test_very_small_limit(self):
+        """smart_truncate with limit < 100 should not produce negative tail_size."""
+        text = "A" * 200
+        result = smart_truncate(text, 50)
+        assert len(result) <= 54  # 50 + "..."
+        assert result.endswith("...")
+
+
+    def test_limit_exactly_100(self):
+        text = "B" * 300
+        result = smart_truncate(text, 100)
+        assert "truncated" in result
+        assert len(result) < 300

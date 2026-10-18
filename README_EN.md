@@ -13,13 +13,13 @@
 
 <p align="center"><a href="README.md">中文</a> · <a href="#key-features">Key features</a> · <a href="#quick-start">Quick start</a> · <a href="#use-from-python">Python API</a> · <a href="#demos">Demos</a> · <a href="#project-structure">Project structure</a></p>
 
-MiniAgent is an **ultra-lightweight Python Agent / Harness with the essentials built in**, centered on just **531 lines of core code**. It supports common agent capabilities such as tool calling, session memory, context management and plugin extensions. **Use it directly, learn how agents work, or customize it to build your own.**
+MiniAgent is an **ultra-lightweight Python Agent / Harness with the essentials built in**, centered on just **524 lines of core code**. It supports common agent capabilities such as tool calling, session memory, context management and plugin extensions. **Use it directly, learn how agents work, or customize it to build your own.**
 
 ## Key features
 
 - 🧠 **Essential capabilities**: native tool calling, streaming, session memory, context compaction, Skills, MCP, plugin management and permission controls form a working Agent / Harness.
 - 🚀 **Ready to use**: connect a model and run coding and automation tasks through the CLI, or embed the runtime in an existing project through the Python API.
-- 📖 **Learn by exploring**: the core is just **531 lines across 4 files**, covering model calls, tool execution and plugin management. Read and run the code to understand how an Agent / Harness works.
+- 📖 **Learn by exploring**: the core is just **524 lines across 4 files**, covering model calls, tool execution and plugin management. Read and run the code to understand how an Agent / Harness works.
 - 🧩 **Build your own**: customize prompts and Skills, add tools and services through Plugin. Reuse the existing session and permission mechanisms as you develop your own agent.
 
 ## Quick start
@@ -88,7 +88,7 @@ The core lives in [agent.py](miniagent/agent.py), [harness.py](miniagent/harness
 
 ```text
 miniagent/
-├── agent.py          # Agent loop · 72 lines
+├── agent.py          # Agent loop · 65 lines
 ├── harness.py        # Plugins, services and lifecycle · 256 lines
 ├── llm.py            # Model calls and streaming · 149 lines
 ├── tools/
@@ -102,7 +102,7 @@ miniagent/
 └── cli.py           # CLI entry point
 ```
 
-The core totals **531 lines**; all first-party package Python totals **5,079 lines**, including legacy compatibility code. Counts include comments and blank lines and exclude third-party dependencies. Run `python scripts/source_stats.py` to verify. [Counting script](scripts/source_stats.py)
+The core totals **524 lines**; all first-party package Python totals **2,067 lines**. Counts include comments and blank lines and exclude third-party dependencies. Run `python scripts/source_stats.py` to verify. [Counting script](scripts/source_stats.py)
 
 ## Docs and contributing
 

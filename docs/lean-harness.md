@@ -1,57 +1,66 @@
-# Lean Harness implementation
+# Native Harness guide — 0.3.0a1 candidate
 
-Six stacked PRs: baseline and targeted fixes; async runtime and policy;
-any-llm; durable sessions; Skills and official MCP; CLI and release checks.
-Each PR targets its predecessor. Merge in order; revert in reverse order.
+MiniAgent is a Python-native mini harness + coding agent. The native runtime,
+CLI, plugins, Skills, MCP and Session are the supported API. The original
+teaching version lives on [codex/legacy-pre-harness](https://github.com/ZhuLinsen/MiniAgent/tree/codex/legacy-pre-harness).
+See [breaking changes and migration](legacy-migration.md).
 
-## Contracts
+## Run and compose
 
-The runtime is async; use `await app.arun()` in an existing event loop.
-`app.run()` is a script convenience. One task per Harness/Session at a time.
-Plugins change only while idle. Startup dependency sorting, rollback and
-reverse cleanup are supported; automatic dependency recovery is deferred.
-Tools pass through one validation/authorization entry point.
+```python
+from miniagent import Harness, Policy, Session
+from miniagent.plugins import coding_tools
 
-Python plugins and MCP servers are trusted software. Workspace checks cover
-managed file tools, not arbitrary shell execution. Shell/MCP require explicit
-authorization; this is not a sandbox. Noninteractive approval defaults to deny.
-Provider keys are isolated. Tool arguments and key prefixes must not be logged.
+app = Harness(model="provider:model-id", policy=Policy(mode="readonly"),
+              session=Session("task.jsonl"))
+app.use(coding_tools())
+print(app.run("Inspect the project and explain its entry points"))
+```
 
-Sessions preserve original events and do not replay uncertain side effects.
-Compaction changes only the model view. Dynamic plugins, Subagent and long-term
-Memory are deferred. Source line counts are observations, not release gates.
+Choose a real model and configure its provider credential. In an existing event
+loop use `await app.arun(...)` and `async with app`. `run()` is a script convenience
+that closes plugin resources on return. One task per Harness/Session at a time;
+plugin and Skill changes are allowed only while idle.
 
-## Validation
+## Plugins, services and cleanup
 
-Run `python -m pytest tests -q` and `python scripts/source_stats.py`.
-Real-provider smoke tests are opt-in and must report provider/model/SDK version;
-mock tests do not establish live compatibility. No provider credential is
-required for deterministic regression tests.
+```python
+from miniagent import Plugin, Tool
 
-Windows baseline: 189 passed, 2 failures caused by Unix-only `sleep` in timeout
-tests. Those tests now invoke the running Python interpreter on every platform.
-Original commit `4d61483d039e802f6d34fb6b42d6e2a99b1b6a1c`: 20 files,
-4,009 physical lines, 3,288 nonempty lines.
+def arithmetic(ctx):
+    ctx.tool(Tool("add_one", "Add one", {"type": "object",
+                  "properties": {"n": {"type": "integer"}}, "required": ["n"]},
+                  lambda n, path: n + 1, access="read"))
+    ctx.cleanup(lambda: print("arithmetic closed"))
 
-## Models
+app.use(Plugin("arithmetic", arithmetic))
+```
 
-Model selection is explicit: CLI `--model` > JSON `llm.model` > `LLM_MODEL` >
-saved connection default. [Interactive connection setup](model-connections.md)
-is available through `--connect`, `/connect` and `/models`.
-There is no implicit model default. A provider key or API base alone cannot
-select a model; noninteractive calls fail before client creation when it is missing.
-The native CLI offers first-run guidance in a TTY; the legacy CLI keeps explicit setup.
-Credentials are resolved after the final model, including JSON and CLI overrides.
-Unprefixed IDs use OpenAI unless an explicit legacy compatibility endpoint is set;
-prefer `provider:model-id`. `LLM_API_KEY`/`LLM_API_BASE` are intentional gateway
-overrides. Provider-specific keys are never borrowed for an unrelated model.
+Policy supplies a resolved `path` argument to every `read`/`write` executor.
+This arithmetic tool accepts that argument and ignores it; it can run under
+`readonly` without changing the Policy interface.
 
-Python >=3.11; validated SDK: any-llm-sdk 1.33.0. SDK HTTP normalization and
-stream assembly are tested without a remote service. Real DeepSeek/Qwen/Claude
-native calls remain unvalidated; two models have live Anspire gateway evidence
-in [the acceptance report](acceptance-2026-10-11.md).
-Use `Harness(model="provider:model-id")` with the provider's environment key.
-Custom JSON configuration:
+`ctx.service(name, value)`, `ctx.get(name)`, `ctx.on(event, callback)` and
+`ctx.cleanup(callback)` share the plugin's Scope. Registrations unwind on unload;
+partial startup rolls back. Tools belong to the instance Registry, not an import
+side effect or global decorator catalog.
+
+Dependencies are static: `requires` names plugins, missing or cyclic dependencies
+fail at startup, and an active dependency cannot be unloaded before its consumers.
+Harness calls the native agent loop directly. Reactive dependencies and a public
+replaceable Loop interface are separate proposals, not requirements of this version.
+
+## Models and configuration
+
+Model precedence: CLI `--model` > JSON `llm.model` > `LLM_MODEL` > saved default.
+A key or endpoint alone never chooses a model. Unprefixed IDs use OpenAI;
+use `provider:model-id` to select another adapter. Credentials resolve after the
+final model; unrelated providers' keys are never borrowed. `LLM_API_KEY` and
+`LLM_API_BASE` remain explicit gateway overrides.
+
+First-run TTY guidance and `/connect`, `/models` reuse the same SDK client factory.
+Native provider optional SDKs may require their any-llm extra. Discovery is not
+evidence of model/tool compatibility. See [connections and vault behavior](model-connections.md).
 
 ```json
 {"llm": {"model": "gateway:model-id"}, "providers": {"gateway": {
@@ -60,148 +69,86 @@ Custom JSON configuration:
 }}}
 ```
 
-Pass `providers=cfg.providers` to Harness. Empty key configuration is supported
-only for explicitly configured keyless custom endpoints. Base URL overrides
-use compatibility mode. Native provider clients retain SDK retry behavior;
-custom endpoints disable retries. The loop never retries tools or interrupted
-streams. `temperature=None` leaves provider defaults unchanged.
-Run live tests with `MINIAGENT_TEST_MODEL` and `python -m pytest -m live -v`.
+Native JSON accepts llm, providers, mcp_servers, system_prompt and context_budget.
+The llm section accepts model, api_key, api_base and temperature. Unsupported
+settings fail with migration guidance. Temperature precedence is CLI
+`--temperature` > JSON `llm.temperature` > `LLM_TEMPERATURE` > 0.7. An empty
+environment value is unset; only the effective value is validated as a finite
+number. JSON `null` leaves the provider default unchanged. Shell/output limits
+stay environment settings in `.env.example`.
 
-## Sessions
+Python >=3.11; any-llm-sdk 1.33.0. Native adapters retain SDK retry behavior;
+custom compatible endpoints disable retries. Tools and interrupted streams are
+never automatically replayed. Four provider protocol fixtures are local HTTP
+tests; live Anspire records are reported separately in [the demo](demo.md) and
+[historical acceptance](acceptance-2026-10-11.md).
 
-Pass `Session(path)` to Harness. JSONL events have version/sequence fields;
-unsupported versions and corrupt complete lines fail explicitly. An incomplete
-last line is discarded under an OS writer lock. Original messages and effects
-remain on disk; protect Session files as sensitive user data.
+## Tools and authorization
 
-Interrupted started tools are uncertain: inspect their actual effects, then use
-`session.open(); session.resolve(call_id, verified_result); session.close()`.
-The runtime refuses new turns until uncertainty is resolved, and never replays
-tools during restore. Calls not yet started get an interrupted result.
-Exceptions after a non-read tool starts (including Shell/MCP timeouts) stop the
-batch and immediately persist an uncertain result. Remaining calls get paired
-unstarted results. The same guard applies without a persistent Session:
-`app.uncertain` reports pending IDs; `app.resolve(id, verified_result)` clears a
-result only after inspection. Cancellation also repairs the full tool batch.
-Authorization/schema failures before execution are known failures; nonzero
-Shell exit codes are known failed outcomes rather than interrupted results.
+`coding_tools()` mounts read, write, edit, grep, glob and bash. Every execution
+passes Skill checks, JSON Schema and Policy before the executor starts. Shell
+uses one async implementation with timeout, cancellation and bounded output.
+Direct trusted integrations can call `await miniagent.plugins.shell(cmd, cwd=...)`.
 
-`MINIAGENT_CONTEXT_BUDGET` includes schemas and output reserve. UTF-8 bytes are
-used as a conservative token estimate, not an exact provider tokenizer.
-Compaction retains whole recent turns, summarizes old data with no tools, and
-falls back to an explicit omission notice. An oversized current turn errors
-instead of splitting a tool group. Long-term Memory remains legacy-only.
+`readonly` denies writes/Shell/MCP; `confirm` asks in a TTY and denies unattended
+approval; `trusted` is for explicitly trusted automation. Managed file tools stay
+inside the workspace and hide `.env*` (except `.env.example`), `.git`, `.pem`,
+`.key`, `.p12` and `.pfx` paths unless `--allow-sensitive-files` is explicit.
+Python plugins, Shell and MCP servers are trusted software outside these file
+checks. Authorization is not a container sandbox.
 
-## Skills and MCP migration
+## Skills and MCP
 
-`app.apply_skill(get_skill("reviewer"))` limits schema visibility AND execution.
-Switching skills or `app.apply_skill()` restores the tool catalog.
-`read_skill(path)` supports scalar name/description and allowed-tools
-(space-separated names or a JSON list) plus Markdown body. This is a limited
-frontmatter format, not full YAML or automatic discovery.
-Scalar `temperature` and positive `max-iterations` are supported. The Skill's
-iteration limit is the default `arun` budget; an explicit `max_steps` overrides it.
+`app.apply_skill(get_skill("reviewer"))` filters both schemas and execution.
+Switching Skill restores registered tools without replaying work. A Skill may
+set temperature and a default max_iterations budget; explicit max_steps wins.
+`read_skill(path)` reads trusted SKILL.md with scalar frontmatter and tool lists,
+not arbitrary YAML. Long-term memory and subagents are deferred for this release.
 
-Install `miniagent[mcp]` (validated MCP SDK 2.3.0), then:
+Install `.[mcp]` and mount `mcp_plugin(name, command, args, ...)` from
+`miniagent.extensions.mcp_plugin`. Tools are named `server__tool`. The official
+SDK stdio connection is owned by a dedicated task and cleaned up on unload.
+CLI JSON can supply mcp_servers entries with command, args and optional env.
+Streamable HTTP is not implemented.
 
-```python
-from miniagent.extensions.mcp_plugin import mcp_plugin
-app.use(mcp_plugin("local", command, args, cwd=workspace))
+## Sessions and recovery
+
+Pass `Session(path)` or CLI `--session <path>` to resume JSONL. Without a CLI path,
+a new session is created under MINIAGENT_HOME/sessions. Session versions and
+sequence numbers are checked; an incomplete trailing line is discarded under
+the OS single-writer lock. Other corruption fails visibly.
+
+Original events stay on disk. Context compaction preserves whole tool groups
+and changes only the model view; UTF-8 bytes provide a conservative budget
+estimate, not exact billing. Summary failure drops older complete turns safely.
+
+If a non-read tool has started and then raises or times out, its result is
+uncertain. The loop stops and pairs remaining unstarted calls without running
+them. Cancellation repairs the complete batch too. Inspect actual effects, then
+use `app.resolve(id, verified_result)` or `/session resolve ID verified-result`.
+Until resolved, further turns are rejected. These guards also apply in memory.
+Schema/authorization rejection and completed nonzero Shell exits are known
+failures. Never resolve a result merely to bypass inspection.
+
+## CLI and validation
+
+Run `miniagent --help`; inside the REPL use `/help`. `/plugins` lists active
+plugins. `/skills [name|path|off]`, `/stream`, `/session [new]` and model commands
+operate on the current runtime. Model switching resolves the new credential,
+closes the old client and starts a fresh Session while preserving old files.
+Non-TTY output stays literal and NO_COLOR is respected.
+
+```bash
+python -m pip install -e ".[dev,mcp,credentials]"
+python -m pytest tests -q -m "not live"
+python scripts/source_stats.py
+python scripts/check_ai_assets.py
 ```
 
-Use an explicit executable and argument list, not a shell command string.
-Tools are namespaced as local__tool. All calls require policy approval even
-if the server declares read-only annotations. The connection has a dedicated
-owner task to close its context in the same task that entered it.
-Discovery failure rolls back tools/services; unload closes the process.
-Remote names are closure-bound: a payload field such as `_name` is forwarded as
-data and cannot change the approved tool route or bypass the Skill whitelist.
-Old MCPClient and load_mcp_tools APIs fail with an actionable migration message.
-Streamable HTTP is deferred.
-
-## CLI and compatibility
-
-Source install: `python -m pip install -e ".[mcp]"` (Python >=3.11).
-The native Harness is now the default CLI. Use provider:model-id and the selected
-provider credential; config files accept llm, providers and mcp_servers.
-An MCP entry has command (executable), args (list), and optional env (mapping).
-CLI: --workspace, --policy readonly|confirm|trusted, --session <JSONL path>,
---skill <name|SKILL.md path>, --prompt, --no-stream.
-Managed files exclude `.env*` except `.env.example`, `.git` and files ending in
-`.pem`, `.key`, `.p12` or `.pfx`. Directory grep/glob also filter these paths.
-Explicit `--allow-sensitive-files` or `Policy(allow_sensitive_files=True)` opts in.
-This does not constrain explicitly trusted Shell/MCP/Python code or detect all
-possible secrets; inspect results before sharing them with a remote model.
-Existing Session files resume automatically. Without --session a new file is
-created under MINIAGENT_HOME/sessions. Non-TTY uses plain literal text; NO_COLOR
-is honored. /plugins lists active plugins; /skills changes the execution view;
-/session shows uncertain calls; /session resolve ID verified-result resolves
-one manually after inspection; /session new starts a fresh task history.
-/model provider:model-id re-evaluates credentials and starts a new Session to
-avoid replaying provider-specific reasoning metadata across models.
-
-`miniagent --legacy` retains the text teaching CLI. MiniAgent remains a
-compatibility import; its native mode delegates to the same loop. Legacy APIs
-retain their prior permission behavior and are not the new policy boundary.
-Native iteration exhaustion now raises instead of returning a tool result as
-an answer. Legacy Reflection and long-term Memory are not part of Harness.
-No automated dependency recovery, Subagent or remote control plane is added.
-
-The release is 0.2.0a1, not a stable v0.3. Original optional tools and teaching
-compatibility modules remain for migration, so the total-source budget is not
-met. Core and total counts are reported separately by scripts/source_stats.py.
-No line count claim is made for installed third-party dependencies.
-CI covers Windows/Linux with Python 3.11/3.12 and the locked MCP extra. Merge
-PRs 1 through 6 in order; revert in reverse order. No release tag is created.
-
-Optional basic/system tools now require `miniagent[legacy]` and explicit loading.
-The default runtime does not import legacy parsers or Reflection. README changes
-are synchronized in Chinese and English; detailed migration remains here.
-
-## Local acceptance evidence
-
-Windows / Python 3.12: 249 deterministic tests passed (3 live cases excluded).
-Two selected models separately passed the three live cases via Anspire.
-Real local MCP stdio subprocess discovery/call/cleanup passed.
-New runtime lint (Ruff F checks), compileall, pip check, wheel and sdist build
-passed. Locked dependencies were upgraded after an audit finding; a repeat
-pip-audit reports no known vulnerabilities. CI adds Linux/Python 3.11 checks;
-those results must be read from the PR, not inferred from local Windows tests.
-New core: 521 physical lines; core plus Policy/tool plugin/Session: 823 lines.
-All official package Python: 4,770 lines, including
-legacy teaching, optional tools, Reflection and Orchestrator. The 2,800-line
-total budget is not achieved; compatibility removal requires a separate,
-explicitly reviewed migration rather than silently deleting existing APIs.
-
-## Review follow-up and remaining acceptance
-
-The four reviewed interruption/status/Skill regressions have dedicated tests.
-MCP route binding prevents payload fields overriding the registered remote name.
-OpenAI, DeepSeek, DashScope/Qwen and Anthropic native SDK HTTP fixtures exercise
-two-turn tool calls and response conversion; these are offline protocol tests.
-The opt-in live suite now covers basic replies and multi-turn tool use both with
-and without streaming. Run it separately for each configured provider with
-`MINIAGENT_TEST_MODEL` and `python -m pytest -m live -v`; credentials are never
-printed. Gateway passes are recorded separately from native-provider coverage.
-
-Every stacked PR has Windows/Linux × Python 3.11/3.12 regression CI. The final
-PR additionally locks dependencies, checks native-runtime Ruff F rules, audits
-production dependencies and installs a built wheel without optional extras.
-`python scripts/minimal_install_smoke.py` requires uv on PATH and one built wheel.
-
-Both READMEs now document the native runtime, supported Python version, plugin
-example and migration guide. CLI parameters have bounded summaries; command and
-content values are hidden. Known Shell/file failures display failed status.
-Logger configuration shares the file-handler implementation (206 → 86 lines),
-preserving its API and cache semantics. Total source remains above the budget.
-
-The [v0.3 migration proposal](legacy-migration.md) covers Legacy, optional tools
-and the old text parser. Current installation/startup measurements and a real
-read/edit/test demo are in [the acceptance report](acceptance-2026-10-11.md).
-Before/after comparison and native-provider validation remain open.
-Automatic dependency recovery and interactive plugin management remain deferred.
-Review readiness is not a stable-release or complete-plan acceptance claim.
-Merge #6 → #7 → #8 → #9 → #10 → #11; use merge commits to preserve stacked
-ancestry, or explicitly retarget/rebase each successor after a squash. The safety
-and product follow-ups are in #11, so intermediate PRs are migration steps rather
-than standalone release candidates. Roll back dependent PRs in reverse order.
+CI covers Windows/Linux, Python 3.11/3.12, full native regression, lint, locked
+production dependency audit, build and a minimum wheel install outside checkout.
+Live tests require explicit MINIAGENT_TEST_MODEL and credentials. Run the
+[source counter](../scripts/source_stats.py) for the current code size. Earlier
+live recordings are historical evidence, not validation of this revised commit.
+No stable release, universal provider compatibility or broad repository success
+rate is claimed.

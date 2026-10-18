@@ -61,27 +61,28 @@ async def shell(cmd, *, cwd, timeout=0):
 
 def coding_tools():
     def setup(ctx):
-        for name in ("read", "write", "edit", "grep", "glob", "bash"):
+        for name in ("read", "write", "edit", "grep", "glob"):
             func = getattr(code_tools, name)
             description = get_tool_description(func)
-            if name == "bash":
-                async def executor(cmd, timeout=0):
-                    return await shell(cmd, cwd=str(ctx.app.policy.workspace), timeout=timeout)
-                access = "shell"
-            else:
-                def executor(_func=func, **kwargs):
-                    token = code_tools._workspace.set(ctx.app.policy.workspace)
-                    visibility = code_tools._path_allowed.set(ctx.app.policy.visible)
-                    try:
-                        result = _func(**kwargs)
-                        failed = isinstance(result, str) and result.startswith("error:")
-                        failed = failed or (isinstance(result, list) and any(
-                            (isinstance(item, dict) and item.get("error")) or
-                            (isinstance(item, str) and item.startswith("error:")) for item in result))
-                        return {"isError": True, "content": result} if failed else result
-                    finally:
-                        code_tools._path_allowed.reset(visibility)
-                        code_tools._workspace.reset(token)
-                access = "write" if name in {"write", "edit"} else "read"
+            def executor(_func=func, **kwargs):
+                token = code_tools._workspace.set(ctx.app.policy.workspace)
+                visibility = code_tools._path_allowed.set(ctx.app.policy.visible)
+                try:
+                    result = _func(**kwargs)
+                    failed = isinstance(result, str) and result.startswith("error:")
+                    failed = failed or (isinstance(result, list) and any(
+                        (isinstance(item, dict) and item.get("error")) or
+                        (isinstance(item, str) and item.startswith("error:")) for item in result))
+                    return {"isError": True, "content": result} if failed else result
+                finally:
+                    code_tools._path_allowed.reset(visibility)
+                    code_tools._workspace.reset(token)
+            access = "write" if name in {"write", "edit"} else "read"
             ctx.tool(Tool(name, description["description"], description["parameters"], executor, access))
+        async def execute_shell(cmd, timeout=0):
+            return await shell(cmd, cwd=str(ctx.app.policy.workspace), timeout=timeout)
+        ctx.tool(Tool("bash", "Execute a shell command in the workspace.", {
+            "type": "object", "properties": {
+                "cmd": {"type": "string"}, "timeout": {"type": "integer", "minimum": 0, "default": 0}},
+            "required": ["cmd"]}, execute_shell, "shell"))
     return Plugin("tools", setup)

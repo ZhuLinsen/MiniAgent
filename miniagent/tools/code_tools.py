@@ -1,21 +1,17 @@
 """Code editing tools for MiniAgent.
 
-These tools are intentionally small, dependency-free, and suitable for open-source use.
-They are designed to be used by the agent via the existing text-based tool calling format.
+File helpers are mounted by coding_tools() through Schema, Policy and Skill checks.
+Shell execution is owned by miniagent.plugins.shell.
 """
 
 from __future__ import annotations
 
-import os
 import re
-import subprocess
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
-from . import register_tool
 from ..logger import get_logger
-from ..utils.text_utils import smart_truncate
 
 logger = get_logger(__name__)
 _workspace = ContextVar("miniagent_workspace", default=None)
@@ -55,7 +51,6 @@ def _iter_files(root: Path) -> List[Path]:
             and (workspace is None or p.resolve().is_relative_to(workspace))]
 
 
-@register_tool
 def read(path: str, offset: int = 1, limit: int = 200) -> str:
     """Read file content with line numbers.
 
@@ -90,7 +85,6 @@ def read(path: str, offset: int = 1, limit: int = 200) -> str:
     return f"path: {file_path}\nlines: {start}-{end}/{total}\n{body}"
 
 
-@register_tool
 def write(path: str, content: str) -> str:
     """Write content to a file.
 
@@ -110,7 +104,6 @@ def write(path: str, content: str) -> str:
         return f"error: {e}"
 
 
-@register_tool
 def edit(path: str, old: str, new: str, all: bool = False) -> str:  # noqa: A002
     """Edit a file via string replacement.
 
@@ -140,7 +133,6 @@ def edit(path: str, old: str, new: str, all: bool = False) -> str:  # noqa: A002
         return f"error: {e}"
 
 
-@register_tool
 def glob(pattern: str, path: str = ".") -> List[str]:  # noqa: A002
     """File pattern matching.
 
@@ -165,7 +157,6 @@ def glob(pattern: str, path: str = ".") -> List[str]:  # noqa: A002
         return [f"error: glob failed: {e}"]
 
 
-@register_tool
 def grep(pattern: str, path: str = ".") -> List[Dict[str, Any]]:  # noqa: A002
     """Regex search in files.
 
@@ -198,41 +189,3 @@ def grep(pattern: str, path: str = ".") -> List[Dict[str, Any]]:  # noqa: A002
                 })
 
     return results
-
-
-@register_tool
-def bash(cmd: str, timeout: int = 0) -> Dict[str, Any]:
-    """Execute a shell command.
-
-    Args:
-        cmd: Shell command string.
-        timeout: Maximum execution time in seconds (0 = use BASH_TIMEOUT env var, default 120).
-
-    Returns:
-        Dict containing exit_code, stdout, stderr.
-    """
-    if timeout <= 0:
-        timeout = int(os.environ.get("BASH_TIMEOUT", "120"))
-    MAX_OUTPUT = int(os.environ.get("BASH_MAX_OUTPUT", "50000"))
-    try:
-        completed = subprocess.run(
-            cmd,
-            shell=True,
-            text=True,
-            capture_output=True,
-            cwd=os.getcwd(),
-            env=os.environ.copy(),
-            timeout=timeout,
-        )
-        stdout = smart_truncate(completed.stdout or "", MAX_OUTPUT)
-        stderr = smart_truncate(completed.stderr or "", MAX_OUTPUT)
-        return {
-            "exit_code": completed.returncode,
-            "stdout": stdout.strip(),
-            "stderr": stderr.strip(),
-        }
-    except subprocess.TimeoutExpired:
-        return {"exit_code": 1, "stdout": "", "stderr": f"Command timed out after {timeout}s"}
-    except Exception as e:
-        logger.exception("bash failed")
-        return {"exit_code": 1, "stdout": "", "stderr": str(e)}

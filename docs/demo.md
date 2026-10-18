@@ -2,7 +2,7 @@
 
 ## 终端任务回放
 
-首页动图来自 2026-10-17 的真实 CLI 任务记录：Windows、Python 3.12、MiniAgent 0.2.0a1。运行基于 main `64c1fcb`，加入展示分支的终端样式；该样式尚未进入主线。记录与素材保留于[原提交](https://github.com/ZhuLinsen/MiniAgent/tree/634b94ec8d9c55b8270807e8387f74ec3beb4de4)。
+首页动图来自 2026-10-17 的真实 CLI 任务记录：Windows、Python 3.12、MiniAgent 0.2.0a1。运行基于 main `64c1fcb`，加入展示分支的终端样式；该样式现已通过 #15 合入主线。记录与素材保留于[原提交](https://github.com/ZhuLinsen/MiniAgent/tree/634b94ec8d9c55b8270807e8387f74ec3beb4de4)。
 
 Agent 读取有错误的 `calculator.py`，将加法函数中的减法修正，再执行原有单元测试。模型之外另跑一次测试确认通过，测试文件 SHA-256 保持不变。此次运行调用真实模型和工具，使用 Anspire 网关的 `qwen3.5-flash`，共 4 次请求、5,068 tokens。
 
@@ -12,7 +12,7 @@ Agent 读取有错误的 `calculator.py`，将加法函数中的减法修正，�
 
 GIF 根据原始文本逐段绘制，保留提示、工具顺序和回答，压缩了播放间隔。这是一项小型函数修复演示，不是响应速度或复杂仓库任务的基准测试。
 
-The GIF replays a real CLI task recorded on the presentation branch, based on main `64c1fcb`. Its terminal styling is not yet part of main. Playback timing is condensed; the transcript, tool results and model answer are preserved. This is a small repair example, not a latency or coding benchmark.
+The GIF replays a real CLI task recorded on the presentation branch, based on main `64c1fcb`. Its terminal styling has since been merged into main through #15. Playback timing is condensed; the transcript, tool results and model answer are preserved. This is a small repair example, not a latency or coding benchmark.
 
 ## 复现任务
 

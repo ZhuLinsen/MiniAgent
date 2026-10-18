@@ -1,6 +1,5 @@
 """Tests for config loading."""
 
-import os
 import pytest
 from miniagent.config import load_config
 
@@ -51,34 +50,9 @@ class TestLoadConfig:
         assert config.llm.temperature >= 0
         assert config.llm.model is not None
 
-    def test_configurable_limits_defaults(self, monkeypatch):
-        monkeypatch.setenv("LLM_API_KEY", "k")
-        config = load_config()
-        assert config.bash_timeout == 120
-        assert config.bash_max_output == 50000
-        assert config.tool_result_limit == 16000
 
-    def test_configurable_limits_from_env(self, monkeypatch):
-        monkeypatch.setenv("LLM_API_KEY", "k")
-        monkeypatch.setenv("BASH_TIMEOUT", "300")
-        monkeypatch.setenv("BASH_MAX_OUTPUT", "100000")
-        monkeypatch.setenv("TOOL_RESULT_LIMIT", "32000")
-        config = load_config()
-        assert config.bash_timeout == 300
-        assert config.bash_max_output == 100000
-        assert config.tool_result_limit == 32000
 
-    def test_confirm_dangerous_true(self, monkeypatch):
-        monkeypatch.setenv("LLM_API_KEY", "k")
-        monkeypatch.setenv("CONFIRM_DANGEROUS", "true")
-        config = load_config()
-        assert config.confirm_dangerous is True
 
-    def test_confirm_dangerous_false(self, monkeypatch):
-        monkeypatch.setenv("LLM_API_KEY", "k")
-        monkeypatch.setenv("CONFIRM_DANGEROUS", "false")
-        config = load_config()
-        assert config.confirm_dangerous is False
 
     def test_no_api_key_at_all(self, monkeypatch):
         """Config should still load when no API key is set."""
@@ -94,3 +68,65 @@ class TestLoadConfig:
             monkeypatch.delenv(key, raising=False)
         config = load_config()
         assert config.llm.api_key is None or config.llm.api_key == ""
+
+
+@pytest.mark.parametrize("section,values", [
+    ("agent", {"enable_reflection": True}), ("agent", {"default_tools": ["calculator"]}),
+    ("llm", {"max_tokens": 10}), ("llm", {"max_retries": 3}),
+])
+def test_retired_or_unsupported_json_settings_fail_explicitly(tmp_path, section, values):
+    import json
+    path = tmp_path / "old.json"
+    data = {"llm": values} if section == "llm" else values
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="Unsupported settings"):
+        load_config(str(path))
+
+
+def test_temperature_uses_advertised_environment_and_json_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "0.25")
+    assert load_config().llm.temperature == 0.25
+    path = tmp_path / "config.json"
+    path.write_text('{"llm":{"temperature":0.5}}')
+    assert load_config(str(path)).llm.temperature == 0.5
+
+
+def test_invalid_temperature_has_actionable_error(monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "not-a-number")
+    with pytest.raises(ValueError, match="temperature must be a"):
+        load_config()
+
+
+@pytest.mark.parametrize("value", ["", "not-a-number"])
+def test_json_temperature_overrides_invalid_environment(value, tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", value)
+    path = tmp_path / "config.json"
+    path.write_text('{"llm":{"temperature":0.5}}')
+    assert load_config(str(path)).llm.temperature == 0.5
+
+
+def test_empty_temperature_environment_uses_default(monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "")
+    assert load_config().llm.temperature == 0.7
+
+
+def test_cli_temperature_overrides_invalid_lower_priority_values(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "not-a-number")
+    path = tmp_path / "config.json"
+    path.write_text('{"llm":{"temperature":"invalid"}}')
+    assert load_config(str(path), temperature_override=0.25).llm.temperature == 0.25
+
+
+@pytest.mark.parametrize("value", ['"invalid"', '{}', 'true', '"nan"', '"inf"'])
+def test_invalid_effective_json_temperature_is_rejected(value, tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text('{"llm":{"temperature":' + value + '}}')
+    with pytest.raises(ValueError, match="temperature must be a"):
+        load_config(str(path))
+
+
+def test_null_json_temperature_keeps_provider_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "not-a-number")
+    path = tmp_path / "config.json"
+    path.write_text('{"llm":{"temperature":null}}')
+    assert load_config(str(path)).llm.temperature is None
