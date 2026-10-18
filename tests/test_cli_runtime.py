@@ -39,6 +39,28 @@ def test_stream_does_not_duplicate_final_answer(tmp_path):
     assert output.getvalue().count("literal text") == 1
 
 
+def test_terminal_welcome_and_help_keep_paths_private(tmp_path, monkeypatch):
+    import sys
+    monkeypatch.setattr(sys, "stdin", io.StringIO("/help\n/q\n"))
+    output = io.StringIO()
+    console = Console(file=output, force_terminal=True, width=100, no_color=True)
+    assert asyncio.run(cli_run(options(tmp_path, prompt=None), console=console, backend=Backend())) == 0
+    text = output.getvalue()
+    assert "Python harness + agent" in text and "readonly" in text
+    assert "Choose a model" in text and "verified result" in text
+    assert str(tmp_path) not in text
+
+
+def test_terminal_one_shot_shows_literal_prompt_once(tmp_path):
+    output = io.StringIO()
+    console = Console(file=output, force_terminal=True, width=100, no_color=True)
+    prompt = "[red]show this literally[/red]"
+    assert asyncio.run(cli_run(options(tmp_path, prompt=prompt), console=console, backend=Backend())) == 0
+    text = output.getvalue()
+    assert text.count(prompt) == 1
+    assert text.count("literal text") == 1
+
+
 def test_repl_session_resume_and_commands(tmp_path, monkeypatch):
     import sys
     monkeypatch.setattr(sys, "stdin", io.StringIO("/help\n/plugins\n/skills reviewer\nfirst\n/session\n/q\n"))

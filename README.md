@@ -102,7 +102,7 @@ miniagent/
 └── cli.py           # 命令行入口
 ```
 
-四文件核心 **531 行**；全部官方包 Python **5,056 行**（含旧版兼容代码）。行数包含注释和空行，不含第三方依赖。运行 `python scripts/source_stats.py` 可复核。[统计脚本](scripts/source_stats.py)
+四文件核心 **531 行**；全部官方包 Python **5,079 行**（含旧版兼容代码）。行数包含注释和空行，不含第三方依赖。运行 `python scripts/source_stats.py` 可复核。[统计脚本](scripts/source_stats.py)
 
 ## 文档与贡献
 
